@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Rhythm Analyzer</title>
+    <link rel="stylesheet" href="./assets/styles.css" />
+  </head>
+
+  <body>
+    <main class="app-shell">
+      <section class="topbar" aria-label="Controls">
+        <div class="control-group control-group--tempo">
+          <label class="field">
+            <span>Size</span>
+            <select id="meterSelect">
+              <option value="4/4">4/4</option>
+              <option value="6/8">6/8</option>
+              <option value="3/4">3/4</option>
+              <option value="2/4">2/4</option>
+              <option value="9/8">9/8</option>
+              <option value="12/8">12/8</option>
+            </select>
+          </label>
+
+          <label class="field bpm-field">
+            <span>BPM</span>
+            <input id="bpmInput" type="number" min="40" max="240" value="96" />
+          </label>
+        </div>
+
+        <div class="control-group control-group--metronome">
+          <div class="control-group__legend">Click</div>
+
+          <div class="segmented" aria-label="Metronome click mode">
+            <label>
+              <input type="radio" name="clickMode" value="quarter" checked />
+              <span>Quarter</span>
+            </label>
+
+            <label>
+              <input type="radio" name="clickMode" value="eighth" />
+              <span>Eighth</span>
+            </label>
+          </div>
+
+          <label class="switch">
+            <input id="soundToggle" type="checkbox" checked />
+            <span>Sound</span>
+          </label>
+        </div>
+
+        <div class="control-group control-group--input">
+          <div class="control-group__legend">Input</div>
+
+          <fieldset class="segmented" aria-label="Input source">
+            <label>
+              <input type="radio" name="inputSource" value="tap" checked />
+              <span>Tap</span>
+            </label>
+
+            <label>
+              <input type="radio" name="inputSource" value="mic" />
+              <span>Mic</span>
+            </label>
+          </fieldset>
+
+          <label class="field sensitivity-field">
+            <span>Sens</span>
+            <input
+              id="sensitivityInput"
+              type="range"
+              min="0.2"
+              max="0.95"
+              step="0.01"
+              value="0.58"
+            />
+          </label>
+        </div>
+
+        <div class="control-group control-group--actions">
+          <button id="startButton" class="primary-button" type="button">
+            Start
+          </button>
+
+          <button
+            id="resetButton"
+            class="icon-button"
+            type="button"
+            title="Reset"
+          >
+            Reset
+          </button>
+
+          <button
+            id="debugToggle"
+            class="icon-button"
+            type="button"
+            title="Debug"
+          >
+            Debug
+          </button>
+        </div>
+      </section>
+
+      <section class="workbench">
+        <section class="timeline-panel" aria-label="Timeline">
+          <div class="timeline-head">
+            <div>
+              <div id="statusLabel" class="status-label">collecting</div>
+              <div id="messageLabel" class="message-label">
+                Start the metronome
+              </div>
+            </div>
+
+            <div id="confidenceLabel" class="confidence-label">0%</div>
+          </div>
+
+          <div id="micWarning" class="mic-warning is-hidden">
+            Mic can hear the metronome. Use headphones for cleaner timing.
+          </div>
+
+          <div id="timeline" class="timeline">
+            <div id="beatMarkers" class="beat-markers"></div>
+            <div id="timelineSegments" class="timeline-segments"></div>
+            <div id="playhead" class="playhead"></div>
+          </div>
+        </section>
+
+        <section class="perform-area" aria-label="Input pad">
+          <button
+            id="tapPad"
+            class="tap-pad"
+            type="button"
+            aria-label="Tap rhythm"
+          >
+            <span class="outer-ring"></span>
+            <span class="middle-ring"></span>
+
+            <span class="inner-core">
+              <span id="padLabel">Tap</span>
+            </span>
+          </button>
+        </section>
+      </section>
+
+      <aside
+        id="debugPanel"
+        class="debug-panel"
+        aria-label="Debug panel"
+      ></aside>
+    </main>
+
+    <script type="module" src="./src/app.js"></script>
+  </body>
+</html>

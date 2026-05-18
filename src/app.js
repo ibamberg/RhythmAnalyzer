@@ -18,7 +18,6 @@ const dom = {
   padLabel: document.querySelector("#padLabel"),
   statusLabel: document.querySelector("#statusLabel"),
   messageLabel: document.querySelector("#messageLabel"),
-  micWarning: document.querySelector("#micWarning"),
   confidenceLabel: document.querySelector("#confidenceLabel"),
   beatMarkers: document.querySelector("#beatMarkers"),
   timelineSegments: document.querySelector("#timelineSegments"),
@@ -102,7 +101,6 @@ for (const control of [dom.meterSelect, dom.bpmInput]) {
 }
 
 dom.soundToggle.addEventListener("change", () => {
-  updateMicWarning();
   if (metronome.isRunning) {
     restart();
   }
@@ -124,7 +122,6 @@ document.querySelectorAll('input[name="inputSource"]').forEach((input) => {
   input.addEventListener("change", async () => {
     state.inputSource = getRadioValue("inputSource");
     updatePadMode();
-    updateMicWarning();
     if (metronome.isRunning) {
       await syncInputSource();
       render();
@@ -134,7 +131,6 @@ document.querySelectorAll('input[name="inputSource"]').forEach((input) => {
 
 render();
 updatePadMode();
-updateMicWarning();
 dom.debugToggle.classList.add("is-active");
 
 async function start() {
@@ -147,7 +143,6 @@ async function start() {
   addDebugEvent(`metronome clock started, sound ${dom.soundToggle.checked ? "on" : "off"}`);
   dom.startButton.textContent = "Stop";
   dom.startButton.classList.add("is-running");
-  updateMicWarning();
   startPlayhead();
   render();
 }
@@ -177,7 +172,6 @@ async function syncInputSource() {
       state.inputSource = "tap";
       setRadioValue("inputSource", "tap");
       updatePadMode();
-      updateMicWarning();
       dom.messageLabel.textContent = "Microphone unavailable";
       addDebugEvent("microphone unavailable");
       console.warn(error);
@@ -347,11 +341,6 @@ function updatePadMode() {
   state.inputSource = getRadioValue("inputSource");
   dom.tapPad.classList.toggle("is-listening", state.inputSource === "mic");
   dom.padLabel.textContent = state.inputSource === "mic" ? "Mic" : "Tap";
-}
-
-function updateMicWarning() {
-  const shouldWarn = state.inputSource === "mic" && dom.soundToggle.checked;
-  dom.micWarning.classList.toggle("is-hidden", !shouldWarn);
 }
 
 function flashPad() {

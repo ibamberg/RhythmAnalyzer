@@ -32,19 +32,6 @@ function renderSummary(result, passCount, referencePass, runtimeDebug) {
         <span>|</span>
         ${escapeHtml(result.message)}
       </div>
-      <div class="debug-summary-row">
-        source ${escapeHtml(runtimeDebug.source || "--")}
-        <span>|</span>
-        sound ${runtimeDebug.soundEnabled ? "on" : "off"}
-        <span>|</span>
-        audio ${escapeHtml(runtimeDebug.audioState || "--")}
-        <span>|</span>
-        mic align ${formatCompactMs(runtimeDebug.micAlignmentOffsetMs)}
-        <span>|</span>
-        last click ${formatMs(runtimeDebug.lastMetronomeClickMs)}
-        <span>|</span>
-        ${escapeHtml(formatLastEvent(runtimeDebug.events))}
-      </div>
     </section>
   `;
 }

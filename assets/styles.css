@@ -40,8 +40,6 @@ body {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  -webkit-text-size-adjust: 100%;
-  text-size-adjust: 100%;
 }
 
 body {
@@ -294,24 +292,12 @@ select {
 }
 
 .perform-area {
-  flex: 0 0 clamp(230px, 28vw, 300px);
-  padding: 7px;
+  flex: 0 0 330px;
+  padding: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
-}
-
-.perform-stack {
-  width: 100%;
-  height: 100%;
-  min-width: 0;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 9px;
 }
 
 /* ==========================================================================
@@ -495,11 +481,9 @@ select {
    ========================================================================== */
 
 .tap-pad {
-  --tap-pad-size: clamp(104px, 18vmin, 200px);
-
   position: relative;
-  width: var(--tap-pad-size);
-  height: var(--tap-pad-size);
+  width: clamp(130px, 22vw, 260px);
+  height: clamp(130px, 22vw, 260px);
 
   display: flex;
   align-items: center;
@@ -511,10 +495,6 @@ select {
   color: var(--ink);
   cursor: pointer;
   touch-action: manipulation;
-}
-
-.tap-pad.is-listening {
-  --tap-pad-size: clamp(84px, 14vmin, 150px);
 }
 
 .outer-ring,
@@ -560,7 +540,7 @@ select {
   background: #f0b84b;
   color: #181104;
 
-  font-size: clamp(15px, 3vmin, 24px);
+  font-size: clamp(17px, 4vh, 28px);
   font-weight: 900;
 
   box-shadow: 0 12px 42px color-mix(in srgb, var(--amber) 28%, transparent);
@@ -575,111 +555,6 @@ select {
 
 .tap-pad.is-hit {
   --tap-flash: 1;
-}
-
-.mic-meter {
-  --mic-level-scale: 0;
-  --mic-threshold-position: 0%;
-
-  width: min(100%, 210px);
-  min-height: 42px;
-  display: grid;
-  grid-template-rows: auto 11px auto;
-  gap: 3px;
-}
-
-.mic-meter.is-hidden {
-  display: none;
-}
-
-.mic-meter__head,
-.mic-meter__foot {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-
-  color: var(--muted);
-  font-size: 9px;
-  line-height: 1;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-
-.mic-meter__head strong {
-  color: var(--ink);
-  font:
-    700 10px/1 ui-monospace,
-    "SFMono-Regular",
-    Menlo,
-    Consolas,
-    monospace;
-}
-
-.mic-meter__track {
-  position: relative;
-  height: 11px;
-  overflow: visible;
-
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background:
-    linear-gradient(
-      90deg,
-      color-mix(in srgb, var(--mint) 8%, #101315),
-      color-mix(in srgb, var(--amber) 10%, #101315)
-    );
-}
-
-.mic-meter__fill {
-  position: absolute;
-  top: 2px;
-  bottom: 2px;
-  left: 2px;
-
-  width: calc(100% - 4px);
-
-  border-radius: 6px;
-  background: linear-gradient(90deg, var(--cyan), var(--mint));
-  box-shadow: 0 0 12px color-mix(in srgb, var(--cyan) 44%, transparent);
-  transform: scaleX(var(--mic-level-scale));
-  transform-origin: left center;
-  transition:
-    transform 55ms linear,
-    background 80ms linear;
-}
-
-.mic-meter__threshold {
-  position: absolute;
-  top: -4px;
-  bottom: -4px;
-  left: clamp(5px, var(--mic-threshold-position), calc(100% - 5px));
-  z-index: 2;
-
-  width: 2px;
-  border-radius: 2px;
-  background: var(--amber);
-  box-shadow: 0 0 10px color-mix(in srgb, var(--amber) 60%, transparent);
-  transform: translateX(-1px);
-}
-
-.mic-meter__threshold::before {
-  content: "";
-  position: absolute;
-  top: -4px;
-  left: 50%;
-
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--amber);
-  transform: translateX(-50%);
-}
-
-.mic-meter.is-over-threshold .mic-meter__fill {
-  background: linear-gradient(90deg, var(--amber), var(--coral));
-  box-shadow: 0 0 15px color-mix(in srgb, var(--coral) 48%, transparent);
 }
 
 /* ==========================================================================
@@ -700,8 +575,6 @@ select {
     Menlo,
     Consolas,
     monospace;
-  -webkit-text-size-adjust: 100%;
-  text-size-adjust: 100%;
   color: #d8ded8;
 }
 
@@ -920,11 +793,7 @@ select {
   }
 
   .perform-area {
-    flex-basis: 190px;
-  }
-
-  .perform-stack {
-    gap: 5px;
+    flex-basis: 250px;
   }
 
   .timeline-panel,
@@ -974,50 +843,22 @@ select {
   }
 
   .tap-pad {
-    --tap-pad-size: clamp(72px, 21vh, 118px);
-  }
-
-  .tap-pad.is-listening {
-    --tap-pad-size: clamp(60px, 18vh, 96px);
+    width: clamp(110px, 15vw, 200px);
+    height: clamp(110px, 15vw, 200px);
   }
 
   .inner-core {
-    font-size: clamp(13px, 3vmin, 20px);
-  }
-
-  .mic-meter {
-    width: min(100%, 170px);
-    min-height: 34px;
-    grid-template-rows: auto 9px auto;
-    gap: 2px;
-  }
-
-  .mic-meter__head,
-  .mic-meter__foot {
-    font-size: 8px;
-  }
-
-  .mic-meter__head strong {
-    font-size: 9px;
-  }
-
-  .mic-meter__track {
-    height: 9px;
+    font-size: clamp(15px, 4vh, 24px);
   }
 
   .debug-panel {
-    flex-basis: 120px;
+    flex-basis: 170px;
     padding: 5px;
-    font-size: 9px;
+    font-size: 10px;
   }
 
   .debug-panel__summary {
-    padding: 3px 5px;
-  }
-
-  .debug-summary-row {
-    font-size: 8px;
-    line-height: 1;
+    padding: 4px 6px;
   }
 
   .debug-matrix th,

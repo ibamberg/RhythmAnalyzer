@@ -7,8 +7,6 @@ import {
 
 const LOOKAHEAD_MS = 25;
 const SCHEDULE_AHEAD_SECONDS = 0.14;
-const START_DELAY_SECONDS = 0.08;
-const PRIMED_CLICK_MAX_AGE_MS = 700;
 
 export class Metronome {
   constructor({ onPassStart = () => {}, onTick = () => {} } = {}) {
@@ -20,7 +18,6 @@ export class Metronome {
     this.isRunning = false;
     this.lastEmittedPassIndex = -1;
     this.lastScheduledClickPerfMs = null;
-    this.primedStartClick = null;
   }
 
   async ensureAudioReady() {
@@ -32,35 +29,6 @@ export class Metronome {
     if (this.audioContext.state === "suspended") {
       await this.audioContext.resume();
     }
-  }
-
-  primeStartClick() {
-    if (this.isRunning) {
-      return;
-    }
-
-    const nowPerfMs = performance.now();
-    if (this.primedStartClick && nowPerfMs - this.primedStartClick.perfTimeMs < PRIMED_CLICK_MAX_AGE_MS) {
-      return;
-    }
-
-    if (!this.audioContext || this.audioContext.state === "closed") {
-      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-      this.audioContext = new AudioContextClass();
-    }
-
-    if (this.audioContext.state === "suspended") {
-      this.audioContext.resume().catch((error) => {
-        console.warn(error);
-      });
-    }
-
-    const clickTime = this.audioContext.currentTime + 0.001;
-    this.scheduleClick(clickTime, true);
-    this.primedStartClick = {
-      audioTime: clickTime,
-      perfTimeMs: nowPerfMs + 1
-    };
   }
 
   async start(settings) {
@@ -75,27 +43,14 @@ export class Metronome {
 
     await this.ensureAudioReady();
 
-    const primedStartClick = this.consumePrimedStartClick();
-    if (this.settings.soundEnabled && primedStartClick) {
-      this.startAudioTime = primedStartClick.audioTime;
-      this.startPerfMs = primedStartClick.perfTimeMs;
-      this.nextClickIndex = 1;
-      this.lastScheduledClickPerfMs = primedStartClick.perfTimeMs;
-    } else {
-      this.startAudioTime = this.audioContext.currentTime + START_DELAY_SECONDS;
-      this.startPerfMs = performance.now() + START_DELAY_SECONDS * 1000;
-      this.nextClickIndex = 0;
-      this.lastScheduledClickPerfMs = null;
-    }
-
+    const startDelaySeconds = 0.08;
+    this.startAudioTime = this.audioContext.currentTime + startDelaySeconds;
+    this.startPerfMs = performance.now() + startDelaySeconds * 1000;
+    this.nextClickIndex = 0;
     this.nextClickTime = this.startAudioTime;
     this.lastEmittedPassIndex = -1;
+    this.lastScheduledClickPerfMs = null;
     this.isRunning = true;
-
-    if (this.nextClickIndex > 0) {
-      const nextClick = this.getClickAtIndex(this.nextClickIndex);
-      this.nextClickTime = this.startAudioTime + nextClick.offsetMs / 1000;
-    }
 
     this.timerId = window.setInterval(() => this.scheduler(), LOOKAHEAD_MS);
     this.boundaryTimerId = window.setInterval(() => this.emitPassBoundaries(), 12);
@@ -256,22 +211,11 @@ export class Metronome {
     return this.startPerfMs + passIndex * this.passDurationMs + position * unitMs;
   }
 
-  consumePrimedStartClick() {
-    const primedStartClick = this.primedStartClick;
-    this.primedStartClick = null;
-
-    if (!primedStartClick || performance.now() - primedStartClick.perfTimeMs > PRIMED_CLICK_MAX_AGE_MS) {
-      return null;
-    }
-
-    return primedStartClick;
-  }
-
   scheduleClick(time, strong) {
     const oscillator = this.audioContext.createOscillator();
     const gain = this.audioContext.createGain();
     const duration = strong ? 0.055 : 0.04;
-    const volume = strong ? 0.44 : 0.24;
+    const volume = strong ? 0.26 : 0.13;
 
     oscillator.type = "sine";
     oscillator.frequency.setValueAtTime(strong ? 1420 : 860, time);

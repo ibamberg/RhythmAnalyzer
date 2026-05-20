@@ -16,10 +16,6 @@ const dom = {
   debugToggle: document.querySelector("#debugToggle"),
   tapPad: document.querySelector("#tapPad"),
   padLabel: document.querySelector("#padLabel"),
-  micMeter: document.querySelector("#micMeter"),
-  micMeterTrack: document.querySelector("#micMeter .mic-meter__track"),
-  micMeterValue: document.querySelector("#micMeterValue"),
-  micMeterThresholdValue: document.querySelector("#micMeterThresholdValue"),
   statusLabel: document.querySelector("#statusLabel"),
   messageLabel: document.querySelector("#messageLabel"),
   confidenceLabel: document.querySelector("#confidenceLabel"),
@@ -29,9 +25,6 @@ const dom = {
   debugPanel: document.querySelector("#debugPanel")
 };
 
-const MIC_METER_BASE_MAX = 0.04;
-const MIC_METER_DECAY = 0.985;
-
 const state = {
   passMap: new Map(),
   currentPassIndex: null,
@@ -39,7 +32,6 @@ const state = {
   isDebugVisible: true,
   inputSource: "tap",
   micDebug: null,
-  micMeterMax: MIC_METER_BASE_MAX,
   micAlignmentOffsetMs: null,
   debugEvents: [],
   rafId: null
@@ -56,7 +48,7 @@ const metronome = new Metronome({
 
 const micDetector = new MicrophoneOnsetDetector({
   onOnset: (event) => {
-    if (state.inputSource === "mic" && metronome.isRunning) {
+    if (state.inputSource === "mic") {
       handleMicOnset(event);
     }
   },
@@ -67,7 +59,6 @@ const micDetector = new MicrophoneOnsetDetector({
     state.micDebug = frame;
     const level = clamp(frame.energy * 11 + frame.onsetScore * 18, 0, 1);
     document.documentElement.style.setProperty("--input-level", String(level));
-    updateMicMeter(frame);
   }
 });
 
@@ -80,12 +71,6 @@ bindTapInput({
   },
   onVisualHit: flashPad
 });
-
-dom.startButton.addEventListener("touchstart", () => {
-  if (!metronome.isRunning && state.inputSource === "tap" && dom.soundToggle.checked) {
-    metronome.primeStartClick();
-  }
-}, { passive: true });
 
 dom.startButton.addEventListener("click", () => {
   if (metronome.isRunning) {
@@ -123,7 +108,6 @@ dom.soundToggle.addEventListener("change", () => {
 
 dom.sensitivityInput.addEventListener("input", () => {
   micDetector.setSensitivity(dom.sensitivityInput.value);
-  updateMicMeter(state.micDebug);
 });
 
 document.querySelectorAll('input[name="clickMode"]').forEach((input) => {
@@ -138,14 +122,15 @@ document.querySelectorAll('input[name="inputSource"]').forEach((input) => {
   input.addEventListener("change", async () => {
     state.inputSource = getRadioValue("inputSource");
     updatePadMode();
-    await syncInputSource();
-    render();
+    if (metronome.isRunning) {
+      await syncInputSource();
+      render();
+    }
   });
 });
 
 render();
 updatePadMode();
-syncInputSource();
 dom.debugToggle.classList.add("is-active");
 
 async function start() {
@@ -164,19 +149,12 @@ async function start() {
 
 function stop() {
   metronome.stop();
-  if (state.inputSource !== "mic") {
-    micDetector.stop();
-  }
+  micDetector.stop();
   addDebugEvent("stopped");
   dom.startButton.textContent = "Start";
   dom.startButton.classList.remove("is-running");
   stopPlayhead();
-  if (state.inputSource === "mic" && micDetector.isRunning) {
-    updateMicMeter(state.micDebug);
-  } else {
-    document.documentElement.style.setProperty("--input-level", "0");
-    updateMicMeter(null);
-  }
+  document.documentElement.style.setProperty("--input-level", "0");
   render();
 }
 
@@ -189,31 +167,17 @@ async function syncInputSource() {
   if (state.inputSource === "mic") {
     try {
       await micDetector.start();
-      if (state.inputSource !== "mic") {
-        micDetector.stop();
-        document.documentElement.style.setProperty("--input-level", "0");
-        updateMicMeter(null);
-        return false;
-      }
-
       addDebugEvent("microphone ready");
-      updateMicMeter(state.micDebug);
-      return true;
     } catch (error) {
       state.inputSource = "tap";
       setRadioValue("inputSource", "tap");
       updatePadMode();
-      document.documentElement.style.setProperty("--input-level", "0");
       dom.messageLabel.textContent = "Microphone unavailable";
       addDebugEvent("microphone unavailable");
       console.warn(error);
-      return false;
     }
   } else {
     micDetector.stop();
-    document.documentElement.style.setProperty("--input-level", "0");
-    updateMicMeter(null);
-    return false;
   }
 }
 
@@ -350,8 +314,6 @@ function renderStatus(model) {
 function resetData() {
   state.passMap.clear();
   state.currentPassIndex = null;
-  state.micDebug = null;
-  state.micMeterMax = MIC_METER_BASE_MAX;
   state.micAlignmentOffsetMs = null;
   state.debugEvents = [];
   state.analysisResult = analyzeRhythm({ meter: dom.meterSelect.value, passes: [] });
@@ -379,59 +341,6 @@ function updatePadMode() {
   state.inputSource = getRadioValue("inputSource");
   dom.tapPad.classList.toggle("is-listening", state.inputSource === "mic");
   dom.padLabel.textContent = state.inputSource === "mic" ? "Mic" : "Tap";
-  updateMicMeter(state.micDebug);
-}
-
-function updateMicMeter(frame) {
-  const isVisible = state.inputSource === "mic" && micDetector.isRunning;
-  dom.micMeter.classList.toggle("is-hidden", !isVisible);
-  dom.micMeter.setAttribute("aria-hidden", String(!isVisible));
-
-  if (!isVisible) {
-    resetMicMeterDisplay();
-    return;
-  }
-
-  const attackLevel = Math.max(0, Number(frame?.onsetScore) || 0);
-  const threshold = Math.max(0, Number(frame?.threshold) || getIdleMicThreshold());
-  const targetMax = Math.max(MIC_METER_BASE_MAX, threshold * 3.2, attackLevel * 1.18);
-  state.micMeterMax = Math.max(targetMax, state.micMeterMax * MIC_METER_DECAY);
-
-  const levelRatio = clamp(attackLevel / state.micMeterMax, 0, 1);
-  const thresholdRatio = clamp(threshold / state.micMeterMax, 0, 1);
-  const levelPercent = Math.round(levelRatio * 100);
-
-  dom.micMeter.style.setProperty("--mic-level-scale", levelRatio.toFixed(4));
-  dom.micMeter.style.setProperty("--mic-threshold-position", `${(thresholdRatio * 100).toFixed(2)}%`);
-  dom.micMeter.classList.toggle("is-over-threshold", isAttackLevel(frame, attackLevel, threshold));
-  dom.micMeterValue.textContent = formatSignal(attackLevel);
-  dom.micMeterThresholdValue.textContent = `attack ${formatSignal(threshold)}`;
-  dom.micMeterTrack.setAttribute("aria-valuenow", String(levelPercent));
-  dom.micMeterTrack.setAttribute(
-    "aria-valuetext",
-    `signal ${formatSignal(attackLevel)}, attack threshold ${formatSignal(threshold)}`
-  );
-}
-
-function resetMicMeterDisplay() {
-  state.micMeterMax = MIC_METER_BASE_MAX;
-  dom.micMeter.style.setProperty("--mic-level-scale", "0");
-  dom.micMeter.style.setProperty("--mic-threshold-position", "0%");
-  dom.micMeter.classList.remove("is-over-threshold");
-  dom.micMeterValue.textContent = "0.00000";
-  dom.micMeterThresholdValue.textContent = `attack ${formatSignal(getIdleMicThreshold())}`;
-  dom.micMeterTrack.setAttribute("aria-valuenow", "0");
-  dom.micMeterTrack.setAttribute("aria-valuetext", "signal 0.00000");
-}
-
-function isAttackLevel(frame, attackLevel, threshold) {
-  if (!frame) {
-    return false;
-  }
-
-  const energy = Number(frame.energy) || 0;
-  const aboveGate = energy >= APP_CONFIG.input.noiseGate || attackLevel > threshold * 1.35;
-  return aboveGate && attackLevel > threshold;
 }
 
 function flashPad() {
@@ -542,15 +451,6 @@ function round(value, decimals) {
 
 function formatDebugMs(value) {
   return Number.isFinite(value) ? value.toFixed(1) : "--";
-}
-
-function formatSignal(value) {
-  return Number.isFinite(value) ? value.toFixed(5) : "0.00000";
-}
-
-function getIdleMicThreshold() {
-  const sensitivity = clamp(Number(dom.sensitivityInput.value) || APP_CONFIG.input.sensitivity, 0.2, 0.95);
-  return Math.max(0.0035 + (1 - sensitivity) * 0.018, APP_CONFIG.input.noiseGate * 0.08);
 }
 
 function clamp(value, min, max) {

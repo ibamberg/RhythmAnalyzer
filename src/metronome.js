@@ -7,6 +7,10 @@ import {
 
 const LOOKAHEAD_MS = 25;
 const SCHEDULE_AHEAD_SECONDS = 0.14;
+const CLICK_VOLUME = {
+  strong: 0.58,
+  weak: 0.34
+};
 
 export class Metronome {
   constructor({ onPassStart = () => {}, onTick = () => {} } = {}) {
@@ -215,7 +219,7 @@ export class Metronome {
     const oscillator = this.audioContext.createOscillator();
     const gain = this.audioContext.createGain();
     const duration = strong ? 0.055 : 0.04;
-    const volume = strong ? 0.26 : 0.13;
+    const volume = strong ? CLICK_VOLUME.strong : CLICK_VOLUME.weak;
 
     oscillator.type = "sine";
     oscillator.frequency.setValueAtTime(strong ? 1420 : 860, time);

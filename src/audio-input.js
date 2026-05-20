@@ -13,6 +13,8 @@ export class MicrophoneOnsetDetector {
     this.previousRms = 0;
     this.previousSample = 0;
     this.averageScore = 0;
+    this.startPromise = null;
+    this.startToken = 0;
   }
 
   async start() {
@@ -20,7 +22,22 @@ export class MicrophoneOnsetDetector {
       return;
     }
 
-    this.stream = await navigator.mediaDevices.getUserMedia({
+    if (this.startPromise) {
+      return this.startPromise;
+    }
+
+    const token = this.startToken + 1;
+    this.startToken = token;
+    this.startPromise = this.open(token);
+    try {
+      await this.startPromise;
+    } finally {
+      this.startPromise = null;
+    }
+  }
+
+  async open(token) {
+    const stream = await navigator.mediaDevices.getUserMedia({
       audio: {
         echoCancellation: false,
         noiseSuppression: false,
@@ -28,10 +45,31 @@ export class MicrophoneOnsetDetector {
       }
     });
 
+    if (token !== this.startToken) {
+      for (const track of stream.getTracks()) {
+        track.stop();
+      }
+      return;
+    }
+
+    this.stream = stream;
+
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
     this.audioContext = new AudioContextClass();
     if (this.audioContext.state === "suspended") {
       await this.audioContext.resume();
+    }
+
+    if (token !== this.startToken) {
+      for (const track of stream.getTracks()) {
+        track.stop();
+      }
+      if (this.audioContext && this.audioContext.state !== "closed") {
+        this.audioContext.close();
+      }
+      this.stream = null;
+      this.audioContext = null;
+      return;
     }
 
     this.contextPerfOffsetMs = performance.now() - this.audioContext.currentTime * 1000;
@@ -50,6 +88,8 @@ export class MicrophoneOnsetDetector {
 
   stop() {
     this.isRunning = false;
+    this.startPromise = null;
+    this.startToken += 1;
 
     if (this.processor) {
       this.processor.onaudioprocess = null;

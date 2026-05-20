@@ -7,7 +7,7 @@ import {
 
 const LOOKAHEAD_MS = 25;
 const SCHEDULE_AHEAD_SECONDS = 0.14;
-const START_DELAY_SECONDS = 0.12;
+const START_DELAY_SECONDS = 0.08;
 const AUDIO_UNLOCK_GAIN = 0.0001;
 
 export class Metronome {
@@ -20,7 +20,6 @@ export class Metronome {
     this.isRunning = false;
     this.lastEmittedPassIndex = -1;
     this.lastScheduledClickPerfMs = null;
-    this.audioPerfOffsetMs = null;
   }
 
   async ensureAudioReady({ unlock = false } = {}) {
@@ -36,8 +35,6 @@ export class Metronome {
     if (this.audioContext.state === "suspended") {
       await this.audioContext.resume();
     }
-
-    this.audioPerfOffsetMs = performance.now() - this.audioContext.currentTime * 1000;
   }
 
   primeAudioFromGesture() {
@@ -58,9 +55,8 @@ export class Metronome {
 
     await this.ensureAudioReady({ unlock: this.settings.soundEnabled });
 
-    this.audioPerfOffsetMs = performance.now() - this.audioContext.currentTime * 1000;
     this.startAudioTime = this.audioContext.currentTime + START_DELAY_SECONDS;
-    this.startPerfMs = this.audioPerfOffsetMs + this.startAudioTime * 1000;
+    this.startPerfMs = performance.now() + START_DELAY_SECONDS * 1000;
     this.nextClickIndex = 0;
     this.nextClickTime = this.startAudioTime;
     this.lastEmittedPassIndex = -1;
@@ -81,16 +77,15 @@ export class Metronome {
     this.boundaryTimerId = null;
   }
 
-  getCurrentPassInfo(atPerfMs = null) {
+  getCurrentPassInfo(atPerfMs = performance.now()) {
     if (!this.settings) {
       return null;
     }
 
-    const nowPerfMs = Number.isFinite(atPerfMs) ? atPerfMs : this.getClockPerfMs();
-    const elapsedMs = nowPerfMs - this.startPerfMs;
+    const elapsedMs = atPerfMs - this.startPerfMs;
     const passIndex = Math.max(0, Math.floor(Math.max(0, elapsedMs) / this.passDurationMs));
     const startedAtMs = this.startPerfMs + passIndex * this.passDurationMs;
-    const elapsedInPassMs = Math.max(0, nowPerfMs - startedAtMs);
+    const elapsedInPassMs = Math.max(0, atPerfMs - startedAtMs);
 
     return {
       passIndex,
@@ -105,13 +100,12 @@ export class Metronome {
     return this.audioContext?.state || "not-created";
   }
 
-  getNearestClickTime(atPerfMs = null) {
+  getNearestClickTime(atPerfMs = performance.now()) {
     if (!this.settings || !this.clickPositions?.length || !Number.isFinite(this.startPerfMs)) {
       return null;
     }
 
-    const nowPerfMs = Number.isFinite(atPerfMs) ? atPerfMs : this.getClockPerfMs();
-    const elapsedMs = nowPerfMs - this.startPerfMs;
+    const elapsedMs = atPerfMs - this.startPerfMs;
     const currentPassIndex = Math.floor(elapsedMs / this.passDurationMs);
     let nearestTime = null;
     let nearestDistance = Infinity;
@@ -123,7 +117,7 @@ export class Metronome {
 
       for (const position of this.clickPositions) {
         const clickTime = this.getClickPerfTime(passIndex, position);
-        const distance = Math.abs(nowPerfMs - clickTime);
+        const distance = Math.abs(atPerfMs - clickTime);
         if (distance < nearestDistance) {
           nearestDistance = distance;
           nearestTime = clickTime;
@@ -134,13 +128,12 @@ export class Metronome {
     return nearestTime;
   }
 
-  getLastClickTime(atPerfMs = null) {
+  getLastClickTime(atPerfMs = performance.now()) {
     if (!this.settings || !this.clickPositions?.length || !Number.isFinite(this.startPerfMs)) {
       return null;
     }
 
-    const nowPerfMs = Number.isFinite(atPerfMs) ? atPerfMs : this.getClockPerfMs();
-    const elapsedMs = nowPerfMs - this.startPerfMs;
+    const elapsedMs = atPerfMs - this.startPerfMs;
     const currentPassIndex = Math.max(0, Math.floor(Math.max(0, elapsedMs) / this.passDurationMs));
     let lastClickTime = null;
 
@@ -151,7 +144,7 @@ export class Metronome {
 
       for (const position of this.clickPositions) {
         const clickTime = this.getClickPerfTime(passIndex, position);
-        if (clickTime <= nowPerfMs && (lastClickTime === null || clickTime > lastClickTime)) {
+        if (clickTime <= atPerfMs && (lastClickTime === null || clickTime > lastClickTime)) {
           lastClickTime = clickTime;
         }
       }
@@ -227,14 +220,6 @@ export class Metronome {
   getClickPerfTime(passIndex, position) {
     const unitMs = this.passDurationMs / this.meter.unitsPerPass;
     return this.startPerfMs + passIndex * this.passDurationMs + position * unitMs;
-  }
-
-  getClockPerfMs() {
-    if (this.audioContext?.state === "running" && this.audioPerfOffsetMs !== null) {
-      return this.audioPerfOffsetMs + this.audioContext.currentTime * 1000;
-    }
-
-    return performance.now();
   }
 
   unlockAudioOutput() {

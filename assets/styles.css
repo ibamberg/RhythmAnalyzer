@@ -292,12 +292,24 @@ select {
 }
 
 .perform-area {
-  flex: 0 0 330px;
-  padding: 8px;
+  flex: 0 0 300px;
+  padding: 7px;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
+}
+
+.perform-stack {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
 }
 
 /* ==========================================================================
@@ -481,9 +493,11 @@ select {
    ========================================================================== */
 
 .tap-pad {
+  --tap-pad-size: clamp(116px, 19vmin, 220px);
+
   position: relative;
-  width: clamp(130px, 22vw, 260px);
-  height: clamp(130px, 22vw, 260px);
+  width: var(--tap-pad-size);
+  height: var(--tap-pad-size);
 
   display: flex;
   align-items: center;
@@ -495,6 +509,10 @@ select {
   color: var(--ink);
   cursor: pointer;
   touch-action: manipulation;
+}
+
+.tap-pad.is-listening {
+  --tap-pad-size: clamp(98px, 16vmin, 176px);
 }
 
 .outer-ring,
@@ -540,7 +558,7 @@ select {
   background: #f0b84b;
   color: #181104;
 
-  font-size: clamp(17px, 4vh, 28px);
+  font-size: clamp(15px, 3vmin, 24px);
   font-weight: 900;
 
   box-shadow: 0 12px 42px color-mix(in srgb, var(--amber) 28%, transparent);
@@ -555,6 +573,111 @@ select {
 
 .tap-pad.is-hit {
   --tap-flash: 1;
+}
+
+.mic-meter {
+  --mic-level-scale: 0;
+  --mic-threshold-position: 0%;
+
+  width: min(100%, 230px);
+  min-height: 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mic-meter.is-hidden {
+  display: none;
+}
+
+.mic-meter__head,
+.mic-meter__foot {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.mic-meter__head strong {
+  color: var(--ink);
+  font:
+    700 10px/1 ui-monospace,
+    "SFMono-Regular",
+    Menlo,
+    Consolas,
+    monospace;
+}
+
+.mic-meter__track {
+  position: relative;
+  height: 13px;
+  overflow: visible;
+
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--mint) 8%, #101315),
+      color-mix(in srgb, var(--amber) 10%, #101315)
+    );
+}
+
+.mic-meter__fill {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: 2px;
+
+  width: calc(100% - 4px);
+
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--cyan), var(--mint));
+  box-shadow: 0 0 12px color-mix(in srgb, var(--cyan) 44%, transparent);
+  transform: scaleX(var(--mic-level-scale));
+  transform-origin: left center;
+  transition:
+    transform 55ms linear,
+    background 80ms linear;
+}
+
+.mic-meter__threshold {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  left: clamp(5px, var(--mic-threshold-position), calc(100% - 5px));
+  z-index: 2;
+
+  width: 2px;
+  border-radius: 2px;
+  background: var(--amber);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--amber) 60%, transparent);
+  transform: translateX(-1px);
+}
+
+.mic-meter__threshold::before {
+  content: "";
+  position: absolute;
+  top: -4px;
+  left: 50%;
+
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--amber);
+  transform: translateX(-50%);
+}
+
+.mic-meter.is-over-threshold .mic-meter__fill {
+  background: linear-gradient(90deg, var(--amber), var(--coral));
+  box-shadow: 0 0 15px color-mix(in srgb, var(--coral) 48%, transparent);
 }
 
 /* ==========================================================================
@@ -793,7 +916,7 @@ select {
   }
 
   .perform-area {
-    flex-basis: 250px;
+    flex-basis: 220px;
   }
 
   .timeline-panel,
@@ -843,12 +966,15 @@ select {
   }
 
   .tap-pad {
-    width: clamp(110px, 15vw, 200px);
-    height: clamp(110px, 15vw, 200px);
+    --tap-pad-size: clamp(88px, 15vmin, 160px);
+  }
+
+  .tap-pad.is-listening {
+    --tap-pad-size: clamp(78px, 13vmin, 132px);
   }
 
   .inner-core {
-    font-size: clamp(15px, 4vh, 24px);
+    font-size: clamp(13px, 3vmin, 20px);
   }
 
   .debug-panel {

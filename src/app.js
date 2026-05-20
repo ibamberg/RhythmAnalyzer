@@ -81,7 +81,18 @@ bindTapInput({
   onVisualHit: flashPad
 });
 
+const startUnlockEvent = "ontouchstart" in window ? "touchstart" : "pointerdown";
+dom.startButton.addEventListener(startUnlockEvent, () => {
+  if (dom.soundToggle.checked) {
+    metronome.unlockAudioOutput();
+  }
+}, { passive: true });
+
 dom.startButton.addEventListener("click", () => {
+  if (dom.soundToggle.checked) {
+    metronome.unlockAudioOutput();
+  }
+
   if (metronome.isRunning) {
     stop();
   } else {

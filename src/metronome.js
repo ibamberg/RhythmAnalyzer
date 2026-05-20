@@ -31,6 +31,25 @@ export class Metronome {
     }
   }
 
+  unlockAudioOutput() {
+    if (!this.audioContext || this.audioContext.state === "closed") {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      this.audioContext = new AudioContextClass();
+    }
+
+    const source = this.audioContext.createBufferSource();
+    source.buffer = this.audioContext.createBuffer(1, 1, this.audioContext.sampleRate);
+    source.connect(this.audioContext.destination);
+    source.onended = () => source.disconnect();
+    source.start(0);
+
+    if (this.audioContext.state === "suspended") {
+      this.audioContext.resume().catch((error) => {
+        console.warn(error);
+      });
+    }
+  }
+
   async start(settings) {
     if (this.isRunning) {
       this.stop();

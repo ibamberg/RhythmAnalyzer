@@ -41,7 +41,6 @@ const state = {
   micDebug: null,
   micMeterMax: MIC_METER_BASE_MAX,
   micAlignmentOffsetMs: null,
-  isStarting: false,
   debugEvents: [],
   rafId: null
 };
@@ -82,22 +81,11 @@ bindTapInput({
   onVisualHit: flashPad
 });
 
-const startPrimeEvent = window.PointerEvent ? "pointerdown" : "touchstart";
-dom.startButton.addEventListener(startPrimeEvent, () => {
-  if (!metronome.isRunning && dom.soundToggle.checked) {
-    metronome.primeAudioFromGesture();
-  }
-}, { passive: true });
-
-dom.startButton.addEventListener("click", async () => {
-  if (state.isStarting) {
-    return;
-  }
-
+dom.startButton.addEventListener("click", () => {
   if (metronome.isRunning) {
     stop();
   } else {
-    await start();
+    start();
   }
 });
 
@@ -155,36 +143,17 @@ syncInputSource();
 dom.debugToggle.classList.add("is-active");
 
 async function start() {
-  state.isStarting = true;
-  dom.startButton.disabled = true;
-  dom.startButton.textContent = "Wait";
-
-  try {
-    resetData();
-    addDebugEvent("start requested");
-    await metronome.ensureAudioReady({ unlock: dom.soundToggle.checked });
-    addDebugEvent(`metronome audio ${metronome.getAudioState()}`);
-    const requestedInputSource = state.inputSource;
-    const inputReady = await syncInputSource();
-    if (requestedInputSource === "mic" && !inputReady) {
-      render();
-      return;
-    }
-
-    await metronome.start(getSettings());
-    addDebugEvent(`metronome clock started, sound ${dom.soundToggle.checked ? "on" : "off"}`);
-    dom.startButton.textContent = "Stop";
-    dom.startButton.classList.add("is-running");
-    startPlayhead();
-    render();
-  } finally {
-    state.isStarting = false;
-    dom.startButton.disabled = false;
-    if (!metronome.isRunning) {
-      dom.startButton.textContent = "Start";
-      dom.startButton.classList.remove("is-running");
-    }
-  }
+  resetData();
+  addDebugEvent("start requested");
+  await metronome.ensureAudioReady();
+  addDebugEvent(`metronome audio ${metronome.getAudioState()}`);
+  await syncInputSource();
+  await metronome.start(getSettings());
+  addDebugEvent(`metronome clock started, sound ${dom.soundToggle.checked ? "on" : "off"}`);
+  dom.startButton.textContent = "Stop";
+  dom.startButton.classList.add("is-running");
+  startPlayhead();
+  render();
 }
 
 function stop() {

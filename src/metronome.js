@@ -7,8 +7,6 @@ import {
 
 const LOOKAHEAD_MS = 25;
 const SCHEDULE_AHEAD_SECONDS = 0.14;
-const START_DELAY_SECONDS = 0.08;
-const AUDIO_UNLOCK_GAIN = 0.0001;
 
 export class Metronome {
   constructor({ onPassStart = () => {}, onTick = () => {} } = {}) {
@@ -22,25 +20,15 @@ export class Metronome {
     this.lastScheduledClickPerfMs = null;
   }
 
-  async ensureAudioReady({ unlock = false } = {}) {
+  async ensureAudioReady() {
     if (!this.audioContext || this.audioContext.state === "closed") {
       const AudioContextClass = window.AudioContext || window.webkitAudioContext;
       this.audioContext = new AudioContextClass();
     }
 
-    if (unlock) {
-      this.unlockAudioOutput();
-    }
-
     if (this.audioContext.state === "suspended") {
       await this.audioContext.resume();
     }
-  }
-
-  primeAudioFromGesture() {
-    this.ensureAudioReady({ unlock: true }).catch((error) => {
-      console.warn(error);
-    });
   }
 
   async start(settings) {
@@ -53,10 +41,11 @@ export class Metronome {
     this.passDurationMs = getPassDurationMs(this.meter, this.settings.bpm);
     this.clickPositions = getClickPositions(this.meter, this.settings.clickMode);
 
-    await this.ensureAudioReady({ unlock: this.settings.soundEnabled });
+    await this.ensureAudioReady();
 
-    this.startAudioTime = this.audioContext.currentTime + START_DELAY_SECONDS;
-    this.startPerfMs = performance.now() + START_DELAY_SECONDS * 1000;
+    const startDelaySeconds = 0.08;
+    this.startAudioTime = this.audioContext.currentTime + startDelaySeconds;
+    this.startPerfMs = performance.now() + startDelaySeconds * 1000;
     this.nextClickIndex = 0;
     this.nextClickTime = this.startAudioTime;
     this.lastEmittedPassIndex = -1;
@@ -222,35 +211,11 @@ export class Metronome {
     return this.startPerfMs + passIndex * this.passDurationMs + position * unitMs;
   }
 
-  unlockAudioOutput() {
-    if (!this.audioContext || this.audioContext.state === "closed") {
-      return;
-    }
-
-    const oscillator = this.audioContext.createOscillator();
-    const gain = this.audioContext.createGain();
-    const now = this.audioContext.currentTime;
-
-    oscillator.type = "sine";
-    oscillator.frequency.setValueAtTime(440, now);
-    gain.gain.setValueAtTime(AUDIO_UNLOCK_GAIN, now);
-    gain.gain.exponentialRampToValueAtTime(0.00001, now + 0.018);
-
-    oscillator.connect(gain);
-    gain.connect(this.audioContext.destination);
-    oscillator.onended = () => {
-      oscillator.disconnect();
-      gain.disconnect();
-    };
-    oscillator.start(now);
-    oscillator.stop(now + 0.02);
-  }
-
   scheduleClick(time, strong) {
     const oscillator = this.audioContext.createOscillator();
     const gain = this.audioContext.createGain();
     const duration = strong ? 0.055 : 0.04;
-    const volume = strong ? 0.26 : 0.13;
+    const volume = strong ? 0.44 : 0.24;
 
     oscillator.type = "sine";
     oscillator.frequency.setValueAtTime(strong ? 1420 : 860, time);

@@ -292,7 +292,7 @@ select {
 }
 
 .perform-area {
-  flex: 0 0 300px;
+  flex: 0 0 clamp(230px, 28vw, 300px);
   padding: 7px;
   display: flex;
   align-items: center;
@@ -493,7 +493,7 @@ select {
    ========================================================================== */
 
 .tap-pad {
-  --tap-pad-size: clamp(116px, 19vmin, 220px);
+  --tap-pad-size: clamp(104px, 18vmin, 200px);
 
   position: relative;
   width: var(--tap-pad-size);
@@ -512,7 +512,7 @@ select {
 }
 
 .tap-pad.is-listening {
-  --tap-pad-size: clamp(98px, 16vmin, 176px);
+  --tap-pad-size: clamp(84px, 14vmin, 150px);
 }
 
 .outer-ring,
@@ -579,11 +579,11 @@ select {
   --mic-level-scale: 0;
   --mic-threshold-position: 0%;
 
-  width: min(100%, 230px);
-  min-height: 48px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  width: min(100%, 210px);
+  min-height: 42px;
+  display: grid;
+  grid-template-rows: auto 11px auto;
+  gap: 3px;
 }
 
 .mic-meter.is-hidden {
@@ -617,7 +617,7 @@ select {
 
 .mic-meter__track {
   position: relative;
-  height: 13px;
+  height: 11px;
   overflow: visible;
 
   border: 1px solid var(--line);
@@ -916,7 +916,11 @@ select {
   }
 
   .perform-area {
-    flex-basis: 220px;
+    flex-basis: 190px;
+  }
+
+  .perform-stack {
+    gap: 5px;
   }
 
   .timeline-panel,
@@ -966,15 +970,35 @@ select {
   }
 
   .tap-pad {
-    --tap-pad-size: clamp(88px, 15vmin, 160px);
+    --tap-pad-size: clamp(72px, 21vh, 118px);
   }
 
   .tap-pad.is-listening {
-    --tap-pad-size: clamp(78px, 13vmin, 132px);
+    --tap-pad-size: clamp(60px, 18vh, 96px);
   }
 
   .inner-core {
     font-size: clamp(13px, 3vmin, 20px);
+  }
+
+  .mic-meter {
+    width: min(100%, 170px);
+    min-height: 34px;
+    grid-template-rows: auto 9px auto;
+    gap: 2px;
+  }
+
+  .mic-meter__head,
+  .mic-meter__foot {
+    font-size: 8px;
+  }
+
+  .mic-meter__head strong {
+    font-size: 9px;
+  }
+
+  .mic-meter__track {
+    height: 9px;
   }
 
   .debug-panel {

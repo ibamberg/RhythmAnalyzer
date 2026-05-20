@@ -131,11 +131,21 @@ document.querySelectorAll('input[name="clickMode"]').forEach((input) => {
 document.querySelectorAll('input[name="inputSource"]').forEach((input) => {
   input.addEventListener("change", async () => {
     state.inputSource = getRadioValue("inputSource");
+    if (state.inputSource === "mic") {
+      primeMicFromGesture();
+    }
     updatePadMode();
     await syncInputSource();
     render();
   });
 });
+
+const micSourceInput = document.querySelector('input[name="inputSource"][value="mic"]');
+const micSourceLabel = micSourceInput?.closest("label");
+if (micSourceLabel) {
+  const micPrimeEvent = window.PointerEvent ? "pointerdown" : "touchstart";
+  micSourceLabel.addEventListener(micPrimeEvent, primeMicFromGesture, { passive: true });
+}
 
 render();
 updatePadMode();
@@ -196,6 +206,7 @@ async function syncInputSource() {
     } catch (error) {
       state.inputSource = "tap";
       setRadioValue("inputSource", "tap");
+      micDetector.stop();
       updatePadMode();
       document.documentElement.style.setProperty("--input-level", "0");
       dom.messageLabel.textContent = "Microphone unavailable";
@@ -376,8 +387,15 @@ function updatePadMode() {
   updateMicMeter(state.micDebug);
 }
 
+function primeMicFromGesture() {
+  micDetector.prime().catch((error) => {
+    addDebugEvent("microphone audio unlock failed");
+    console.warn(error);
+  });
+}
+
 function updateMicMeter(frame) {
-  const isVisible = state.inputSource === "mic" && micDetector.isRunning;
+  const isVisible = state.inputSource === "mic";
   dom.micMeter.classList.toggle("is-hidden", !isVisible);
   dom.micMeter.setAttribute("aria-hidden", String(!isVisible));
 

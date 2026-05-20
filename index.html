@@ -29,9 +29,8 @@
           </label>
         </div>
 
-        <div class="control-group control-group--metronome">
-          <div class="control-group__legend">Click</div>
-
+        <div class="control-group control-group--metronome" style="flex-direction: column; align-items: start; color: var(--muted);">
+          <div style="font-size: 9px;">Metronome</div>
           <div class="segmented" aria-label="Metronome click mode">
             <label>
               <input type="radio" name="clickMode" value="quarter" checked />
@@ -42,28 +41,34 @@
               <input type="radio" name="clickMode" value="eighth" />
               <span>Eighth</span>
             </label>
-          </div>
 
-          <label class="switch">
-            <input id="soundToggle" type="checkbox" checked />
-            <span>Sound</span>
-          </label>
+            <label class="switch">
+              <input id="soundToggle" type="checkbox" checked />
+              <span>Sound</span>
+            </label>
+          </div>
         </div>
 
         <div class="control-group control-group--input">
-          <div class="control-group__legend">Input</div>
 
-          <fieldset class="segmented" aria-label="Input source">
-            <label>
-              <input type="radio" name="inputSource" value="tap" checked />
-              <span>Tap</span>
-            </label>
+    
+      
 
-            <label>
-              <input type="radio" name="inputSource" value="mic" />
-              <span>Mic</span>
-            </label>
-          </fieldset>
+            <fieldset class="segmented" aria-label="Input source" style="display: flex; flex-direction: column;">
+              <div style="font-size: 9px; color: var(--muted);">Input</div>
+              <div style="display: flex;">
+                <label>
+                  <input type="radio" name="inputSource" value="tap" checked />
+                  <span>Tap</span>
+                </label>
+
+                <label>
+                  <input type="radio" name="inputSource" value="mic" />
+                  <span>Mic</span>
+                </label>
+              </div>
+            </fieldset>
+       
 
           <label class="field sensitivity-field">
             <span>Sens</span>

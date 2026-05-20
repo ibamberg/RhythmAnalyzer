@@ -95,19 +95,19 @@ select {
 }
 
 .control-group--tempo {
-  flex: 0 0 275px;
+  flex: 1;
 }
 
 .control-group--metronome {
-  flex: 0 0 250px;
+  flex: 1;
 }
 
 .control-group--input {
-  flex: 0 0 280px;
+  flex: 1;
 }
 
 .control-group--actions {
-  flex: 0 0 220px;
+  flex: 1;
 }
 
 .control-group__legend,
@@ -562,7 +562,7 @@ select {
    ========================================================================== */
 
 .debug-panel {
-  flex: 0 0 128px;
+  flex: 0 0 100px;
   padding: 7px;
   display: flex;
   flex-direction: column;
@@ -601,6 +601,7 @@ select {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-size: 9px;
 }
 
 .debug-panel__summary span {
@@ -740,7 +741,7 @@ select {
   }
 
   .control-group {
-    height: 76px;
+    height: 56px;
     padding: 5px;
     gap: 5px;
     flex: 1;
@@ -780,7 +781,7 @@ select {
   }
 
   .control-group--actions .primary-button {
-    flex-basis: 68px;
+    flex-basis: 55px;
   }
 
   .control-group--actions .icon-button {

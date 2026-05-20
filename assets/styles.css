@@ -1006,7 +1006,7 @@ select {
   }
 
   .debug-panel {
-    flex-basis: 170px;
+    flex-basis: 120px;
     padding: 5px;
     font-size: 9px;
   }

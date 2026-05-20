@@ -1,7 +1,6 @@
 import { APP_CONFIG } from "./config.js";
 
 const PROCESSOR_BUFFER_SIZE = 1024;
-const FALLBACK_POLL_GRACE_MS = 180;
 
 export class MicrophoneOnsetDetector {
   constructor({ onOnset = () => {}, onLevel = () => {}, onDebug = () => {} } = {}) {
@@ -14,17 +13,12 @@ export class MicrophoneOnsetDetector {
     this.previousRms = 0;
     this.previousSample = 0;
     this.averageScore = 0;
-    this.lastProcessAtMs = 0;
-    this.fallbackRafId = null;
   }
 
   async start() {
     if (this.isRunning) {
-      await this.prime();
       return;
     }
-
-    await this.prime();
 
     this.stream = await navigator.mediaDevices.getUserMedia({
       audio: {
@@ -34,48 +28,28 @@ export class MicrophoneOnsetDetector {
       }
     });
 
-    await this.prime();
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    this.audioContext = new AudioContextClass();
+    if (this.audioContext.state === "suspended") {
+      await this.audioContext.resume();
+    }
 
     this.contextPerfOffsetMs = performance.now() - this.audioContext.currentTime * 1000;
     this.source = this.audioContext.createMediaStreamSource(this.stream);
     this.processor = this.audioContext.createScriptProcessor(PROCESSOR_BUFFER_SIZE, 1, 1);
-    this.analyser = this.audioContext.createAnalyser();
-    this.analyser.fftSize = PROCESSOR_BUFFER_SIZE;
-    this.analyserSamples = new Float32Array(this.analyser.fftSize);
-    this.analyserByteSamples = new Uint8Array(this.analyser.fftSize);
     this.silentGain = this.audioContext.createGain();
-    this.silentGain.gain.value = 0.000001;
+    this.silentGain.gain.value = 0;
 
     this.processor.onaudioprocess = (event) => this.processAudio(event);
-    this.lastProcessAtMs = 0;
     this.source.connect(this.processor);
-    this.source.connect(this.analyser);
     this.processor.connect(this.silentGain);
     this.silentGain.connect(this.audioContext.destination);
 
     this.isRunning = true;
-    this.startFallbackPolling();
-  }
-
-  async prime() {
-    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContextClass) {
-      throw new Error("Web Audio API unavailable");
-    }
-
-    if (!this.audioContext || this.audioContext.state === "closed") {
-      this.audioContext = new AudioContextClass();
-    }
-
-    if (this.audioContext.state === "suspended") {
-      await this.audioContext.resume();
-    }
   }
 
   stop() {
     this.isRunning = false;
-    cancelAnimationFrame(this.fallbackRafId);
-    this.fallbackRafId = null;
 
     if (this.processor) {
       this.processor.onaudioprocess = null;
@@ -104,9 +78,6 @@ export class MicrophoneOnsetDetector {
     this.audioContext = null;
     this.source = null;
     this.processor = null;
-    this.analyser = null;
-    this.analyserSamples = null;
-    this.analyserByteSamples = null;
     this.silentGain = null;
   }
 
@@ -119,7 +90,6 @@ export class MicrophoneOnsetDetector {
       return;
     }
 
-    this.lastProcessAtMs = performance.now();
     const samples = event.inputBuffer.getChannelData(0);
     const frame = this.analyzeSamples(samples);
     const sampleRate = this.audioContext.sampleRate;
@@ -129,10 +99,6 @@ export class MicrophoneOnsetDetector {
       : performance.now() - bufferDurationMs;
     const onsetTimeMs = bufferStartMs + (frame.peakIndex / sampleRate) * 1000;
 
-    this.handleFrame(frame, onsetTimeMs);
-  }
-
-  handleFrame(frame, onsetTimeMs) {
     this.onLevel(frame);
     this.onDebug(frame);
 
@@ -149,37 +115,6 @@ export class MicrophoneOnsetDetector {
         onsetScore: frame.onsetScore,
         flux: frame.flux
       });
-    }
-  }
-
-  startFallbackPolling() {
-    const poll = () => {
-      if (!this.isRunning) {
-        return;
-      }
-
-      const now = performance.now();
-      if (this.analyser && now - this.lastProcessAtMs > FALLBACK_POLL_GRACE_MS) {
-        this.readAnalyserSamples();
-        const frame = this.analyzeSamples(this.analyserSamples);
-        this.handleFrame(frame, now);
-      }
-
-      this.fallbackRafId = requestAnimationFrame(poll);
-    };
-
-    this.fallbackRafId = requestAnimationFrame(poll);
-  }
-
-  readAnalyserSamples() {
-    if (typeof this.analyser.getFloatTimeDomainData === "function") {
-      this.analyser.getFloatTimeDomainData(this.analyserSamples);
-      return;
-    }
-
-    this.analyser.getByteTimeDomainData(this.analyserByteSamples);
-    for (let index = 0; index < this.analyserByteSamples.length; index += 1) {
-      this.analyserSamples[index] = (this.analyserByteSamples[index] - 128) / 128;
     }
   }
 

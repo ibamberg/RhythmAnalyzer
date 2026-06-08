@@ -1,7 +1,7 @@
 import { APP_CONFIG, getMeterConfig, getPassDurationMs } from "./config.js";
-import { analyzeRhythm } from "./rhythm-core.js";
-import { buildTimelineModel } from "./render-core.js";
-import { Metronome } from "./metronome.js";
+import { analyzeRhythm } from "./rhythm-core.js?v=3";
+import { buildTimelineModel } from "./render-core.js?v=2";
+import { Metronome } from "./metronome.js?v=2";
 import { MicrophoneOnsetDetector } from "./audio-input.js";
 import { bindTapInput } from "./tap-input.js";
 import { renderDebugPanel } from "./debug-panel.js";
@@ -11,6 +11,7 @@ const dom = {
   bpmInput: document.querySelector("#bpmInput"),
   sensitivityInput: document.querySelector("#sensitivityInput"),
   soundToggle: document.querySelector("#soundToggle"),
+  clickModeInputs: [...document.querySelectorAll('input[name="clickMode"]')],
   startButton: document.querySelector("#startButton"),
   resetButton: document.querySelector("#resetButton"),
   debugToggle: document.querySelector("#debugToggle"),
@@ -22,7 +23,11 @@ const dom = {
   beatMarkers: document.querySelector("#beatMarkers"),
   timelineSegments: document.querySelector("#timelineSegments"),
   playhead: document.querySelector("#playhead"),
-  debugPanel: document.querySelector("#debugPanel")
+  debugPanel: document.querySelector("#debugPanel"),
+  testHitMode: document.querySelector("#testHitMode"),
+  testHitsInput: document.querySelector("#testHitsInput"),
+  testApplyButton: document.querySelector("#testApplyButton"),
+  testClearButton: document.querySelector("#testClearButton")
 };
 
 const state = {
@@ -57,8 +62,6 @@ const micDetector = new MicrophoneOnsetDetector({
       return;
     }
     state.micDebug = frame;
-    const level = clamp(frame.energy * 11 + frame.onsetScore * 18, 0, 1);
-    document.documentElement.style.setProperty("--input-level", String(level));
   }
 });
 
@@ -85,10 +88,31 @@ dom.resetButton.addEventListener("click", () => {
   render();
 });
 
+dom.testApplyButton.addEventListener("click", () => {
+  applyTestHits();
+});
+
+dom.testClearButton.addEventListener("click", () => {
+  dom.testHitsInput.value = "";
+  resetData();
+  render();
+});
+
+dom.testHitsInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    applyTestHits();
+  }
+});
+
 dom.debugToggle.addEventListener("click", () => {
   state.isDebugVisible = !state.isDebugVisible;
   dom.debugToggle.classList.toggle("is-active", state.isDebugVisible);
   dom.debugPanel.classList.toggle("is-hidden", !state.isDebugVisible);
+});
+
+window.addEventListener("resize", () => {
+  renderTimeline(buildTimelineModel(state.analysisResult));
 });
 
 for (const control of [dom.meterSelect, dom.bpmInput]) {
@@ -101,6 +125,7 @@ for (const control of [dom.meterSelect, dom.bpmInput]) {
 }
 
 dom.soundToggle.addEventListener("change", () => {
+  updateMetronomeSoundState();
   if (metronome.isRunning) {
     restart();
   }
@@ -108,9 +133,10 @@ dom.soundToggle.addEventListener("change", () => {
 
 dom.sensitivityInput.addEventListener("input", () => {
   micDetector.setSensitivity(dom.sensitivityInput.value);
+  updateSensitivityFill();
 });
 
-document.querySelectorAll('input[name="clickMode"]').forEach((input) => {
+dom.clickModeInputs.forEach((input) => {
   input.addEventListener("change", () => {
     if (metronome.isRunning) {
       restart();
@@ -131,6 +157,8 @@ document.querySelectorAll('input[name="inputSource"]').forEach((input) => {
 
 render();
 updatePadMode();
+updateSensitivityFill();
+updateMetronomeSoundState();
 dom.debugToggle.classList.add("is-active");
 
 async function start() {
@@ -154,7 +182,6 @@ function stop() {
   dom.startButton.textContent = "Start";
   dom.startButton.classList.remove("is-running");
   stopPlayhead();
-  document.documentElement.style.setProperty("--input-level", "0");
   render();
 }
 
@@ -274,6 +301,93 @@ function refreshAnalysis() {
   render();
 }
 
+function applyTestHits() {
+  const meter = getMeterConfig(dom.meterSelect.value);
+  const durationMs = getPassDurationMs(meter, Number(dom.bpmInput.value) || 96);
+  const mode = dom.testHitMode.value;
+  const parsed = parseTestHits(dom.testHitsInput.value);
+
+  if (!parsed.ok) {
+    dom.messageLabel.textContent = parsed.message;
+    addDebugEvent(parsed.message);
+    renderDebugPanel(dom.debugPanel, getPasses(), state.analysisResult, getRuntimeDebug());
+    return;
+  }
+
+  const hitsMs = mode === "ms"
+    ? parsed.values
+    : parsed.values.map((position) => (position / meter.unitsPerPass) * durationMs);
+  const sanitizedHits = hitsMs
+    .filter((hit) => Number.isFinite(hit) && hit >= 0 && hit < durationMs)
+    .map((hit) => round(hit, 3))
+    .sort((a, b) => a - b);
+
+  if (!sanitizedHits.length) {
+    dom.messageLabel.textContent = "No valid test hits";
+    addDebugEvent("test hits rejected: empty");
+    renderDebugPanel(dom.debugPanel, getPasses(), state.analysisResult, getRuntimeDebug());
+    return;
+  }
+
+  if (metronome.isRunning) {
+    stop();
+  } else {
+    stopPlayhead();
+  }
+
+  state.passMap.clear();
+  state.currentPassIndex = 2;
+  state.micAlignmentOffsetMs = null;
+  state.debugEvents = [];
+
+  for (const index of [1, 2]) {
+    state.passMap.set(index, {
+      index,
+      startedAtMs: index * durationMs,
+      durationMs,
+      hitsMs: [...sanitizedHits]
+    });
+  }
+
+  state.analysisResult = analyzeRhythm({
+    meter: meter.id,
+    passes: getPasses()
+  });
+  dom.playhead.style.left = "0%";
+  addDebugEvent(`test hits applied: ${sanitizedHits.join(", ")}`);
+  render();
+}
+
+function parseTestHits(rawValue) {
+  const source = rawValue.trim();
+
+  if (!source) {
+    return { ok: false, message: "Paste a hit array" };
+  }
+
+  let value;
+  try {
+    value = JSON.parse(source);
+  } catch {
+    value = source
+      .replace(/[\[\]]/g, "")
+      .split(/[\s,;]+/)
+      .filter(Boolean)
+      .map(Number);
+  }
+
+  if (!Array.isArray(value)) {
+    return { ok: false, message: "Hits must be an array" };
+  }
+
+  const values = value.map(Number);
+  if (!values.length || values.some((item) => !Number.isFinite(item))) {
+    return { ok: false, message: "Hits must be numbers" };
+  }
+
+  return { ok: true, values };
+}
+
 function render() {
   const timelineModel = buildTimelineModel(state.analysisResult);
   renderTimeline(timelineModel);
@@ -282,27 +396,441 @@ function render() {
 }
 
 function renderTimeline(model) {
+  const rhythmWidth = getRhythmRenderWidth();
+
   dom.beatMarkers.innerHTML = model.beatMarkers
     .map(
       (marker) => `
         <div class="beat-marker ${marker.strong ? "is-strong" : ""}" style="left:${marker.positionPercent}%">
-          <span>${marker.label}</span>
         </div>
       `
     )
     .join("");
 
-  dom.timelineSegments.innerHTML = model.segments
-    .map((segment) => {
-      const smallClass = segment.widthPercent < 8 ? "is-small" : "";
-      return `
-        <div class="note-segment ${smallClass}" style="width:${segment.widthPercent}%" title="${segment.label}">
-          <span class="glyph">${segment.glyph}</span>
-          <span class="label">${segment.label}</span>
-        </div>
-      `;
+  dom.timelineSegments.innerHTML = model.segments.length
+    ? renderSongsterrRhythm(
+        model.segments,
+        model.meterUnits,
+        model.meterUnitName,
+        model.rhythmBoundaries,
+        rhythmWidth
+      )
+    : "";
+}
+
+function getRhythmRenderWidth() {
+  const width = Math.round(dom.timelineSegments.clientWidth);
+  if (window.matchMedia("(max-width: 760px)").matches && width > 0) {
+    return Math.max(320, width);
+  }
+
+  return 1000;
+}
+
+function renderSongsterrRhythm(segments, meterUnits, meterUnitName, rhythmBoundaries, rhythmWidth) {
+  const notes = buildRhythmNotes(segments, meterUnits, meterUnitName, rhythmBoundaries, rhythmWidth);
+  const stems = notes
+    .filter((note) => note.stem)
+    .map((note) => renderRhythmStem(note, rhythmWidth))
+    .join("");
+  const beams = renderRhythmBeams(notes, rhythmWidth);
+  const tuplets = renderRhythmTuplets(notes, rhythmWidth);
+  const holds = notes
+    .filter((note) => note.duration === "whole")
+    .map((note) => {
+      const width = round(clamp(Math.max(34, note.endX - note.x), 1, rhythmWidth - note.x), 3);
+      return `<rect class="rhythm-hold" x="${note.x}" y="83" width="${width}" height="4" />`;
     })
     .join("");
+
+  return `
+    <svg class="songsterr-rhythm" viewBox="0 0 ${rhythmWidth} 112" preserveAspectRatio="none" aria-hidden="true">
+      ${holds}
+      ${stems}
+      ${beams}
+      ${tuplets.paths}
+    </svg>
+    ${tuplets.labels}
+  `;
+}
+
+function buildRhythmNotes(segments, meterUnits, meterUnitName, rhythmBoundaries, rhythmWidth) {
+  const displaySegments = buildDisplayRhythmSegments(
+    segments,
+    meterUnits,
+    meterUnitName,
+    rhythmBoundaries
+  );
+
+  return displaySegments.map((segment) => {
+    const startPercent = (segment.fromPosition / meterUnits) * 100;
+    const endPercent = (segment.toPosition / meterUnits) * 100;
+    const startX = positionToRhythmX(
+      segment.fromPosition,
+      meterUnits,
+      rhythmBoundaries,
+      "start",
+      rhythmWidth
+    );
+    const endX = positionToRhythmX(
+      segment.toPosition,
+      meterUnits,
+      rhythmBoundaries,
+      "end",
+      rhythmWidth
+    );
+    const info = getRhythmDurationInfo(segment.duration);
+
+    return {
+      ...segment,
+      x: startX,
+      startX,
+      endX,
+      startPercent,
+      beamGroup: getBeamGroup(segment.fromPosition, rhythmBoundaries),
+      stem: info.stem !== false,
+      stemTop: info.stemTop,
+      stemBottom: info.stemBottom,
+      beams: info.beams,
+      dotted: info.dotted
+    };
+  });
+}
+
+function buildDisplayRhythmSegments(segments, meterUnits, meterUnitName, rhythmBoundaries) {
+  const boundaries = Array.isArray(rhythmBoundaries) && rhythmBoundaries.length
+    ? rhythmBoundaries
+    : [0, meterUnits];
+  let fallbackPosition = 0;
+
+  return segments.flatMap((segment, sourceIndex) => {
+    const sourceFrom = Number.isFinite(segment.fromPosition)
+      ? segment.fromPosition
+      : fallbackPosition;
+    const sourceTo = Number.isFinite(segment.toPosition)
+      ? segment.toPosition
+      : sourceFrom + segment.value;
+    const pieces = [];
+    let fromPosition = sourceFrom;
+
+    fallbackPosition = sourceTo;
+
+    if (isOnRhythmBoundary(sourceFrom, boundaries) && sourceTo <= meterUnits + 0.0001) {
+      return [
+        {
+          ...segment,
+          sourceIndex,
+          duration: segment.duration || getDisplayDuration(sourceTo - sourceFrom, meterUnitName),
+          value: Math.max(0, sourceTo - sourceFrom),
+          fromPosition: sourceFrom,
+          toPosition: sourceTo,
+          isContinuation: false,
+          continuesToNext: false
+        }
+      ];
+    }
+
+    while (fromPosition < sourceTo - 0.0001) {
+      const boundary = getNextRhythmBoundary(fromPosition, boundaries, meterUnits);
+      const toPosition = Math.min(sourceTo, boundary);
+      const value = Math.max(0, toPosition - fromPosition);
+
+      if (value > 0.0001) {
+        pieces.push({
+          ...segment,
+          sourceIndex,
+          duration: isOriginalPiece(fromPosition, toPosition, sourceFrom, sourceTo) && segment.duration
+            ? segment.duration
+            : getDisplayDuration(value, meterUnitName),
+          value,
+          fromPosition,
+          toPosition,
+          isContinuation: fromPosition > sourceFrom + 0.0001,
+          continuesToNext: toPosition < sourceTo - 0.0001
+        });
+      }
+
+      fromPosition = toPosition;
+    }
+
+    return pieces;
+  });
+}
+
+function getNextRhythmBoundary(position, boundaries, meterUnits) {
+  const epsilon = 0.0001;
+  const nextBoundary = boundaries.find((boundary) => boundary > position + epsilon);
+  return nextBoundary ?? meterUnits;
+}
+
+function isOnRhythmBoundary(position, boundaries) {
+  const epsilon = 0.0001;
+  return boundaries.some((boundary) => Math.abs(boundary - position) < epsilon);
+}
+
+function isOriginalPiece(fromPosition, toPosition, sourceFrom, sourceTo) {
+  return (
+    Math.abs(fromPosition - sourceFrom) < 0.0001 &&
+    Math.abs(toPosition - sourceTo) < 0.0001
+  );
+}
+
+function getDisplayDuration(value, meterUnitName) {
+  const values = meterUnitName === "eighth"
+    ? [
+        ["whole", 8],
+        ["dottedHalf", 6],
+        ["half", 4],
+        ["dottedQuarter", 3],
+        ["quarter", 2],
+        ["dottedEighth", 1.5],
+        ["eighth", 1],
+        ["sixteenth", 0.5]
+      ]
+    : [
+        ["whole", 4],
+        ["dottedHalf", 3],
+        ["half", 2],
+        ["dottedQuarter", 1.5],
+        ["quarter", 1],
+        ["dottedEighth", 0.75],
+        ["eighth", 0.5],
+        ["eighthTriplet", 1 / 3],
+        ["sixteenth", 0.25]
+      ];
+  let best = values[0];
+  let bestDistance = Infinity;
+
+  for (const candidate of values) {
+    const distance = Math.abs(value - candidate[1]);
+    if (distance < bestDistance) {
+      best = candidate;
+      bestDistance = distance;
+    }
+  }
+
+  return best[0];
+}
+
+function positionToRhythmX(position, meterUnits, rhythmBoundaries, edge = "start", width = 1000) {
+  const boundaries = Array.isArray(rhythmBoundaries) && rhythmBoundaries.length
+    ? rhythmBoundaries
+    : [0, meterUnits];
+  const boundaryIndex = findRhythmBoundaryIndex(position, boundaries, edge);
+  const from = boundaries[boundaryIndex] ?? 0;
+  const to = boundaries[boundaryIndex + 1] ?? meterUnits;
+  const groupLeft = (from / meterUnits) * width;
+  const groupRight = (to / meterUnits) * width;
+  const groupWidth = Math.max(1, groupRight - groupLeft);
+  const inset = Math.min(26, groupWidth * 0.11);
+  const local = clamp((position - from) / Math.max(0.0001, to - from), 0, 1);
+
+  return round(groupLeft + inset + local * Math.max(1, groupWidth - inset * 2), 3);
+}
+
+function findRhythmBoundaryIndex(position, boundaries, edge = "start") {
+  const epsilon = 0.0001;
+
+  if (edge === "end") {
+    for (let index = 1; index < boundaries.length; index += 1) {
+      if (Math.abs(position - boundaries[index]) < epsilon) {
+        return Math.max(0, index - 1);
+      }
+    }
+  }
+
+  for (let index = boundaries.length - 2; index >= 0; index -= 1) {
+    if (position >= boundaries[index] - epsilon) {
+      return index;
+    }
+  }
+
+  return 0;
+}
+
+function getRhythmDurationInfo(duration) {
+  const durations = {
+    whole: { stem: false, beams: 0, dotted: false, stemTop: 46, stemBottom: 86 },
+    dottedHalf: { beams: 0, dotted: true, stemTop: 42, stemBottom: 86 },
+    half: { beams: 0, dotted: false, stemTop: 42, stemBottom: 86 },
+    dottedQuarter: { beams: 0, dotted: true, stemTop: 24, stemBottom: 86 },
+    quarter: { beams: 0, dotted: false, stemTop: 24, stemBottom: 86 },
+    dottedEighth: { beams: 1, dotted: true, stemTop: 24, stemBottom: 86 },
+    eighth: { beams: 1, dotted: false, stemTop: 24, stemBottom: 86 },
+    eighthTriplet: { beams: 1, dotted: false, stemTop: 24, stemBottom: 86 },
+    dottedEighthTriplet: { beams: 1, dotted: true, stemTop: 24, stemBottom: 86 },
+    sixteenthTriplet: { beams: 2, dotted: false, stemTop: 24, stemBottom: 86 },
+    quarterTriplet: { beams: 0, dotted: false, stemTop: 24, stemBottom: 86 },
+    sixteenth: { beams: 2, dotted: false, stemTop: 24, stemBottom: 86 }
+  };
+
+  return durations[duration] || durations.quarter;
+}
+
+function getBeamGroup(position, rhythmBoundaries) {
+  const boundaries = Array.isArray(rhythmBoundaries) && rhythmBoundaries.length
+    ? rhythmBoundaries
+    : [0, 1];
+  return findRhythmBoundaryIndex(position, boundaries);
+}
+
+function renderRhythmStem(note, rhythmWidth) {
+  const x = round(clamp(note.x, 0, rhythmWidth), 3);
+  const dot = note.dotted
+    ? `<path class="rhythm-dot" d="M ${round(getRhythmDotX(note, rhythmWidth), 3)} ${round(note.stemBottom - 12, 3)} h 0.01" />`
+    : "";
+
+  return `
+    <line class="rhythm-stem" x1="${x}" y1="${note.stemTop}" x2="${x}" y2="${note.stemBottom}" />
+    ${dot}
+  `;
+}
+
+function getRhythmDotX(note, rhythmWidth) {
+  return clamp(note.x + 8, 0, rhythmWidth);
+}
+
+function renderRhythmBeams(notes, rhythmWidth) {
+  const beams = [];
+
+  for (const level of [1, 2]) {
+    let index = 0;
+    while (index < notes.length) {
+      if (notes[index].beams < level) {
+        index += 1;
+        continue;
+      }
+
+      const startIndex = index;
+      while (
+        index < notes.length &&
+        notes[index].beams >= level &&
+        notes[index].beamGroup === notes[startIndex].beamGroup
+      ) {
+        index += 1;
+      }
+
+      beams.push(...renderBeamRun(notes, startIndex, index, level, rhythmWidth));
+    }
+  }
+
+  return beams.join("");
+}
+
+function renderBeamRun(notes, startIndex, endIndex, level, rhythmWidth) {
+  const run = notes.slice(startIndex, endIndex);
+  const y = level === 1 ? 83 : 75;
+  const height = level === 1 ? 5 : 4;
+
+  if (run.length === 1) {
+    return [renderBeamStub(notes, startIndex, level, y, height, rhythmWidth)];
+  }
+
+  const first = run[0];
+  const last = run[run.length - 1];
+  return [renderBeamRect(first.x, last.x, y, height, rhythmWidth)];
+}
+
+function renderBeamStub(notes, noteIndex, level, y, height, rhythmWidth) {
+  const note = notes[noteIndex];
+  const direction = getBeamStubDirection(notes, noteIndex, level);
+  const length = getRhythmBeamStubLength(notes, noteIndex, direction);
+
+  return renderBeamRect(note.x, note.x + direction * length, y, height, rhythmWidth);
+}
+
+function getBeamStubDirection(notes, noteIndex, level) {
+  const note = notes[noteIndex];
+  const previous = notes[noteIndex - 1];
+  const next = notes[noteIndex + 1];
+  const lowerLevel = Math.max(1, level - 1);
+  const hasPreviousBeam =
+    previous && previous.beamGroup === note.beamGroup && previous.beams >= lowerLevel;
+  const hasNextBeam =
+    next && next.beamGroup === note.beamGroup && next.beams >= lowerLevel;
+
+  return hasNextBeam || !hasPreviousBeam ? 1 : -1;
+}
+
+function getRhythmBeamStubLength(notes, noteIndex, direction) {
+  const note = notes[noteIndex];
+  const neighbor = direction > 0 ? notes[noteIndex + 1] : notes[noteIndex - 1];
+  const available =
+    neighbor && neighbor.beamGroup === note.beamGroup
+      ? Math.abs(neighbor.x - note.x)
+      : Math.abs(note.endX - note.startX);
+
+  return clamp(available * 0.42, 18, 34);
+}
+
+function renderBeamRect(fromX, toX, y, height, rhythmWidth) {
+  const stemWidth = 1.5;
+  const left = Math.min(fromX, toX);
+  const right = Math.max(fromX, toX);
+  const x = clamp(left - stemWidth / 2, 0, rhythmWidth);
+  const rightEdge = clamp(right + stemWidth / 2, 0, rhythmWidth);
+
+  return `<rect class="rhythm-beam" x="${round(x, 3)}" y="${y}" width="${round(Math.max(1, rightEdge - x), 3)}" height="${height}" />`;
+}
+
+function renderRhythmTuplets(notes, rhythmWidth) {
+  const paths = [];
+  const labels = [];
+  let index = 0;
+
+  while (index < notes.length) {
+    if (!isTripletDuration(notes[index].duration)) {
+      index += 1;
+      continue;
+    }
+
+    const runStart = index;
+    while (
+      index < notes.length &&
+      isTripletDuration(notes[index].duration) &&
+      notes[index].beamGroup === notes[runStart].beamGroup
+    ) {
+      index += 1;
+    }
+
+    for (let groupStart = runStart; groupStart < index; groupStart += 1) {
+      let groupEnd = groupStart;
+      let totalValue = 0;
+      while (groupEnd < index && totalValue < 1 - 0.001) {
+        totalValue += notes[groupEnd].value;
+        groupEnd += 1;
+      }
+
+      if (Math.abs(totalValue - 1) > 0.001 || groupEnd - groupStart < 2) {
+        groupStart = groupEnd - 1;
+        continue;
+      }
+
+      const first = notes[groupStart];
+      const last = notes[groupEnd - 1];
+      const left = round(clamp(first.x, 0, rhythmWidth), 3);
+      const right = round(clamp(last.x, 0, rhythmWidth), 3);
+      const center = round((left + right) / 2, 3);
+
+      paths.push(`
+        <path class="rhythm-tuplet" d="M ${left} 96 V 103 H ${right} V 96" />
+      `);
+      labels.push(
+        `<span class="rhythm-tuplet-number" style="left:${round((center / rhythmWidth) * 100, 4)}%">3</span>`
+      );
+
+      groupStart = groupEnd - 1;
+    }
+  }
+
+  return {
+    paths: paths.join(""),
+    labels: labels.join("")
+  };
+}
+
+function isTripletDuration(duration) {
+  return String(duration).includes("Triplet");
 }
 
 function renderStatus(model) {
@@ -341,6 +869,22 @@ function updatePadMode() {
   state.inputSource = getRadioValue("inputSource");
   dom.tapPad.classList.toggle("is-listening", state.inputSource === "mic");
   dom.padLabel.textContent = state.inputSource === "mic" ? "Mic" : "Tap";
+}
+
+function updateSensitivityFill() {
+  const min = Number(dom.sensitivityInput.min);
+  const max = Number(dom.sensitivityInput.max);
+  const value = Number(dom.sensitivityInput.value);
+  const percent = clamp(((value - min) / (max - min)) * 100, 0, 100);
+  dom.sensitivityInput.style.background =
+    `linear-gradient(to right, #58d6b2 0%, #58d6b2 ${percent}%, #31393c ${percent}%, #31393c 100%) center / 100% 4px no-repeat`;
+}
+
+function updateMetronomeSoundState() {
+  const isSoundEnabled = dom.soundToggle.checked;
+  for (const input of dom.clickModeInputs) {
+    input.disabled = !isSoundEnabled;
+  }
 }
 
 function flashPad() {
@@ -465,6 +1009,6 @@ window.__rhythmAnalyzer = {
     return getMeterConfig(dom.meterSelect.value);
   },
   get passDurationMs() {
-    return getPassDurationMs(getMeterConfig(dom.meterSelect.value), Number(dom.bpmInput.value) || 96);
+    return getPassDurationMs(getMeterConfig(dom.meterSelect.value), Number(dom.bpmInput.value) || 100);
   }
 };

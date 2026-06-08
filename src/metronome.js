@@ -7,6 +7,7 @@ import {
 
 const LOOKAHEAD_MS = 25;
 const SCHEDULE_AHEAD_SECONDS = 0.14;
+const CLICK_NOISE_SECONDS = 0.018;
 
 export class Metronome {
   constructor({ onPassStart = () => {}, onTick = () => {} } = {}) {
@@ -213,20 +214,47 @@ export class Metronome {
 
   scheduleClick(time, strong) {
     const oscillator = this.audioContext.createOscillator();
-    const gain = this.audioContext.createGain();
-    const duration = strong ? 0.055 : 0.04;
-    const volume = strong ? 0.26 : 0.13;
+    const toneGain = this.audioContext.createGain();
+    const noise = this.audioContext.createBufferSource();
+    const noiseFilter = this.audioContext.createBiquadFilter();
+    const noiseGain = this.audioContext.createGain();
+    const duration = strong ? 0.08 : 0.065;
+    const toneVolume = strong ? 2.2 : 1.65;
+    const noiseVolume = strong ? 1.35 : 1;
+    const sampleRate = this.audioContext.sampleRate;
+    const noiseBuffer = this.audioContext.createBuffer(
+      1,
+      Math.floor(sampleRate * CLICK_NOISE_SECONDS),
+      sampleRate
+    );
+    const noiseData = noiseBuffer.getChannelData(0);
 
-    oscillator.type = "sine";
-    oscillator.frequency.setValueAtTime(strong ? 1420 : 860, time);
-    gain.gain.setValueAtTime(0.0001, time);
-    gain.gain.exponentialRampToValueAtTime(volume, time + 0.004);
-    gain.gain.exponentialRampToValueAtTime(0.0001, time + duration);
+    for (let index = 0; index < noiseData.length; index += 1) {
+      noiseData[index] = Math.random() * 2 - 1;
+    }
 
-    oscillator.connect(gain);
-    gain.connect(this.audioContext.destination);
+    oscillator.type = "square";
+    oscillator.frequency.setValueAtTime(strong ? 1800 : 1100, time);
+    toneGain.gain.setValueAtTime(0.0001, time);
+    toneGain.gain.exponentialRampToValueAtTime(toneVolume, time + 0.001);
+    toneGain.gain.exponentialRampToValueAtTime(0.0001, time + duration);
+
+    noise.buffer = noiseBuffer;
+    noiseFilter.type = "highpass";
+    noiseFilter.frequency.setValueAtTime(2600, time);
+    noiseGain.gain.setValueAtTime(0.0001, time);
+    noiseGain.gain.exponentialRampToValueAtTime(noiseVolume, time + 0.001);
+    noiseGain.gain.exponentialRampToValueAtTime(0.0001, time + CLICK_NOISE_SECONDS);
+
+    oscillator.connect(toneGain);
+    toneGain.connect(this.audioContext.destination);
+    noise.connect(noiseFilter);
+    noiseFilter.connect(noiseGain);
+    noiseGain.connect(this.audioContext.destination);
     oscillator.start(time);
+    noise.start(time);
     oscillator.stop(time + duration + 0.02);
+    noise.stop(time + CLICK_NOISE_SECONDS + 0.01);
   }
 }
 

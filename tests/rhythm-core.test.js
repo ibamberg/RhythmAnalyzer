@@ -46,10 +46,59 @@ test("sixteenths 4/4", () => {
 test("triplets 4/4", () => {
   const result = analyzeRhythm({
     meter: "4/4",
-    passes: [pass(1, 3000, [0, 250, 500, 750, 1000, 1250, 1500, 1750])]
+    passes: [
+      pass(1, 3000, [
+        0,
+        250,
+        500,
+        750,
+        1000,
+        1250,
+        1500,
+        1750,
+        2000,
+        2250,
+        2500,
+        2750
+      ])
+    ]
   });
-  assert.deepEqual(durations(result.passes[0]).slice(0, 7), Array(7).fill("eighthTriplet"));
-  assert.ok(result.passes[0].elements.at(-1).value > 1);
+  assert.deepEqual(durations(result.passes[0]), Array(12).fill("eighthTriplet"));
+});
+
+test("mixed triplet spelling 4/4", () => {
+  const result = analyzeRhythm({
+    meter: "4/4",
+    passes: [pass(1, 2400, [0, 600, 1200, 1400, 1500, 1800, 2100, 2250])]
+  });
+  assert.deepEqual(durations(result.passes[0]), [
+    "quarter",
+    "quarter",
+    "eighthTriplet",
+    "sixteenthTriplet",
+    "dottedEighthTriplet",
+    "eighth",
+    "sixteenth",
+    "sixteenth"
+  ]);
+});
+
+test("analysis windows stop at beat boundaries", () => {
+  const result = analyzeRhythm({
+    meter: "4/4",
+    passes: [pass(1, 2000, [0, 250, 500])]
+  });
+  assert.deepEqual(durations(result.passes[0]), ["eighth", "eighth", "quarter"]);
+  assert.equal(result.passes[0].elements[1].toPosition, 1);
+});
+
+test("slightly early boundary hit belongs to next window", () => {
+  const result = analyzeRhythm({
+    meter: "4/4",
+    passes: [pass(1, 2000, [0, 480, 1000, 1500])]
+  });
+  assert.deepEqual(durations(result.passes[0]), ["quarter", "quarter", "quarter", "quarter"]);
+  assert.equal(result.passes[0].normalizedHits[1].quantizedPosition, 1);
 });
 
 test("uneven eighths", () => {

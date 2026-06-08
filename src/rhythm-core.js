@@ -101,35 +101,20 @@ export function analyzeRhythm(input) {
 export function analyzePass(meter, pass) {
   const hitsMs = sanitizeHits(pass.hitsMs, pass.durationMs);
   const tolerance = getPositionTolerance(pass.durationMs, meter.unitsPerPass);
-  const normalizedHits = hitsMs.map((rawMs) => {
-    const position = (rawMs / pass.durationMs) * meter.unitsPerPass;
-    const quantizedPosition = quantizePosition(position, meter);
-    return {
-      rawMs: round(rawMs, 3),
-      position: round(position, 4),
-      quantizedPosition: round(quantizedPosition, 4)
-    };
-  });
+  const normalizedHits = dedupeQuantizedHits(
+    hitsMs.map((rawMs) => {
+      const position = (rawMs / pass.durationMs) * meter.unitsPerPass;
+      const quantizedPosition = quantizePosition(position, meter);
+      return {
+        rawMs: round(rawMs, 3),
+        position: round(position, 4),
+        quantizedPosition: round(quantizedPosition, 4)
+      };
+    })
+  );
 
-  const elements = normalizedHits.map((hit, index) => {
-    const nextHit = normalizedHits[index + 1];
-    const toPosition = nextHit ? nextHit.quantizedPosition : meter.unitsPerPass;
-    const value = Math.max(0, toPosition - hit.quantizedPosition);
-    const durationInfo = classifyDuration(value, meter, tolerance);
-    const fromMs = (hit.quantizedPosition / meter.unitsPerPass) * pass.durationMs;
-    const toMs = (toPosition / meter.unitsPerPass) * pass.durationMs;
-
-    return {
-      type: "note",
-      duration: durationInfo.duration,
-      value: round(value, 4),
-      fromPosition: round(hit.quantizedPosition, 4),
-      toPosition: round(toPosition, 4),
-      fromMs: round(fromMs, 3),
-      toMs: round(toMs, 3),
-      confidence: round(durationInfo.confidence, 4)
-    };
-  });
+  const rawElements = buildWindowedElements(normalizedHits, meter, pass.durationMs, tolerance);
+  const elements = spellTupletDurations(rawElements, meter);
 
   const hitConfidence = normalizedHits.length
     ? normalizedHits.reduce((sum, hit) => {
@@ -150,6 +135,70 @@ export function analyzePass(meter, pass) {
     confidence: round(hitConfidence * 0.65 + elementConfidence * 0.35, 4),
     similarityToReference: null
   };
+}
+
+function buildWindowedElements(normalizedHits, meter, durationMs, tolerance) {
+  const boundaries = buildRhythmBoundaries(meter);
+  const elements = [];
+
+  for (let boundaryIndex = 0; boundaryIndex < boundaries.length - 1; boundaryIndex += 1) {
+    const windowStart = boundaries[boundaryIndex];
+    const windowEnd = boundaries[boundaryIndex + 1];
+    const windowHits = normalizedHits.filter(
+      (hit) =>
+        hit.quantizedPosition >= windowStart - EPSILON &&
+        hit.quantizedPosition < windowEnd - EPSILON
+    );
+
+    for (let hitIndex = 0; hitIndex < windowHits.length; hitIndex += 1) {
+      const hit = windowHits[hitIndex];
+      const nextHit = windowHits[hitIndex + 1];
+      const toPosition = nextHit ? nextHit.quantizedPosition : windowEnd;
+      const value = Math.max(0, toPosition - hit.quantizedPosition);
+
+      if (value <= EPSILON) {
+        continue;
+      }
+
+      const durationInfo = classifyDuration(value, meter, tolerance);
+      const fromMs = (hit.quantizedPosition / meter.unitsPerPass) * durationMs;
+      const toMs = (toPosition / meter.unitsPerPass) * durationMs;
+
+      elements.push({
+        type: "note",
+        duration: durationInfo.duration,
+        value: round(value, 4),
+        fromPosition: round(hit.quantizedPosition, 4),
+        toPosition: round(toPosition, 4),
+        fromMs: round(fromMs, 3),
+        toMs: round(toMs, 3),
+        confidence: round(durationInfo.confidence, 4)
+      });
+    }
+  }
+
+  return elements;
+}
+
+function dedupeQuantizedHits(hits) {
+  const deduped = [];
+
+  for (const hit of hits) {
+    const previous = deduped[deduped.length - 1];
+    if (
+      previous === undefined ||
+      Math.abs(hit.quantizedPosition - previous.quantizedPosition) >= 0.0001
+    ) {
+      deduped.push(hit);
+      continue;
+    }
+
+    if (Math.abs(hit.position - hit.quantizedPosition) < Math.abs(previous.position - previous.quantizedPosition)) {
+      deduped[deduped.length - 1] = hit;
+    }
+  }
+
+  return deduped;
 }
 
 export function sanitizeHits(hitsMs, durationMs) {
@@ -201,6 +250,9 @@ export function classifyDuration(value, meter, tolerance = APP_CONFIG.analysis.a
       continue;
     }
     const durationValue = values[duration];
+    if (!Number.isFinite(durationValue)) {
+      continue;
+    }
     const distance = Math.abs(value - durationValue);
     if (distance < bestDistance) {
       bestDuration = duration;
@@ -215,6 +267,79 @@ export function classifyDuration(value, meter, tolerance = APP_CONFIG.analysis.a
     value: bestValue,
     confidence: clamp(1 - bestDistance / Math.max(allowedDistance, EPSILON), 0, 1)
   };
+}
+
+function spellTupletDurations(elements, meter) {
+  if (meter.unitName !== "quarter" || elements.length < 2) {
+    return elements;
+  }
+
+  const spelled = elements.map((element) => ({ ...element }));
+
+  for (let beat = 0; beat < meter.unitsPerPass; beat += 1) {
+    const beatStart = beat;
+    const beatEnd = beat + 1;
+    const beatElements = spelled.filter(
+      (element) =>
+        element.fromPosition >= beatStart - EPSILON &&
+        element.fromPosition < beatEnd - EPSILON &&
+        element.toPosition <= beatEnd + EPSILON
+    );
+
+    if (beatElements.length < 2 || !fillsBeat(beatElements, beatStart, beatEnd)) {
+      continue;
+    }
+
+    if (!usesTripletGrid(beatElements, beatStart)) {
+      continue;
+    }
+
+    for (const element of beatElements) {
+      const tripletDuration = getTripletDuration(element.value);
+      if (tripletDuration) {
+        element.duration = tripletDuration;
+        element.confidence = Math.max(element.confidence, 0.96);
+      }
+    }
+  }
+
+  return spelled;
+}
+
+function fillsBeat(elements, beatStart, beatEnd) {
+  const first = elements[0];
+  const last = elements[elements.length - 1];
+  return (
+    Math.abs(first.fromPosition - beatStart) < 0.001 &&
+    Math.abs(last.toPosition - beatEnd) < 0.001
+  );
+}
+
+function usesTripletGrid(elements, beatStart) {
+  return elements.some((element) =>
+    [element.fromPosition, element.toPosition].some((position) =>
+      isTripletOnlyPoint(position - beatStart)
+    )
+  );
+}
+
+function isTripletOnlyPoint(value) {
+  const normalized = ((value % 1) + 1) % 1;
+  return [1 / 6, 1 / 3, 2 / 3, 5 / 6].some(
+    (tripletPoint) => Math.abs(normalized - tripletPoint) < 0.001
+  );
+}
+
+function getTripletDuration(value) {
+  const tripletDurations = [
+    ["sixteenthTriplet", 1 / 6],
+    ["eighthTriplet", 1 / 3],
+    ["dottedEighthTriplet", 1 / 2],
+    ["quarterTriplet", 2 / 3]
+  ];
+
+  const match = tripletDurations.find(([, durationValue]) => Math.abs(value - durationValue) < 0.001);
+  return match?.[0] || null;
 }
 
 export function calculateAdaptiveTolerance(passes, baseConfig = APP_CONFIG.analysis) {
@@ -290,6 +415,22 @@ function findReferencePassIndex(analyzedPasses, tolerance) {
   return bestIndex;
 }
 
+function buildRhythmBoundaries(meter) {
+  const boundaries = [0];
+  let cursor = 0;
+
+  for (const groupSize of meter.defaultGrouping) {
+    cursor += groupSize;
+    boundaries.push(cursor);
+  }
+
+  if (boundaries.at(-1) !== meter.unitsPerPass) {
+    boundaries.push(meter.unitsPerPass);
+  }
+
+  return boundaries;
+}
+
 function buildQuantizationCandidates(meter) {
   const candidates = new Set([0, meter.unitsPerPass]);
 
@@ -299,8 +440,10 @@ function buildQuantizationCandidates(meter) {
       candidates.add(round(unit + 0.25, 6));
       candidates.add(round(unit + 0.5, 6));
       candidates.add(round(unit + 0.75, 6));
+      candidates.add(round(unit + 1 / 6, 6));
       candidates.add(round(unit + 1 / 3, 6));
       candidates.add(round(unit + 2 / 3, 6));
+      candidates.add(round(unit + 5 / 6, 6));
     }
   } else {
     for (let unit = 0; unit <= meter.unitsPerPass; unit += 0.5) {

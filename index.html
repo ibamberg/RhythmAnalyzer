@@ -4,15 +4,15 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Rhythm Analyzer</title>
-    <link rel="stylesheet" href="./assets/styles.css" />
+    <link rel="stylesheet" href="./assets/styles.css?v=30" />
   </head>
 
   <body>
     <main class="app-shell">
       <section class="topbar" aria-label="Controls">
-        <div class="control-group control-group--tempo">
-          <label class="field">
-            <span>Size</span>
+        <div class="topbar-panel panel">
+          <div class="control-group">
+            <div for="meterSelect">Size</div>
             <select id="meterSelect">
               <option value="4/4">4/4</option>
               <option value="6/8">6/8</option>
@@ -21,95 +21,103 @@
               <option value="9/8">9/8</option>
               <option value="12/8">12/8</option>
             </select>
-          </label>
+          </div>
 
-          <label class="field bpm-field">
-            <span>BPM</span>
+          <div class="control-group">
+            <div class="field bpm-field" for="bpmInput">BPM</div>
             <input id="bpmInput" type="number" min="40" max="240" value="96" />
-          </label>
-        </div>
-
-        <div class="control-group control-group--metronome" style="flex-direction: column; align-items: start; color: var(--muted);">
-          <div style="font-size: 9px;">Metronome</div>
-          <div class="segmented" aria-label="Metronome click mode">
-            <label>
-              <input type="radio" name="clickMode" value="quarter" checked />
-              <span>Quarter</span>
-            </label>
-
-            <label>
-              <input type="radio" name="clickMode" value="eighth" />
-              <span>Eighth</span>
-            </label>
-
-            <label class="switch">
-              <input id="soundToggle" type="checkbox" checked />
-              <span>Sound</span>
-            </label>
           </div>
         </div>
 
-        <div class="control-group control-group--input">
-
-    
-      
-
-            <fieldset class="segmented" aria-label="Input source" style="display: flex; flex-direction: column;">
-              <div style="font-size: 9px; color: var(--muted);">Input</div>
-              <div style="display: flex;">
-                <label>
-                  <input type="radio" name="inputSource" value="tap" checked />
-                  <span>Tap</span>
+        <div class="topbar-panel panel">
+          <div class="control-group">
+            <div>Metronome</div>
+            <div class="control-row">
+              <div class="segmented segmented--metronome" aria-label="Metronome click mode">
+                <label class="segmented__split">
+                  <input id="soundToggle" type="checkbox" checked />
+                  <span class="control-button">Sound</span>
                 </label>
 
                 <label>
-                  <input type="radio" name="inputSource" value="mic" />
-                  <span>Mic</span>
+                  <input type="radio" name="clickMode" value="quarter" checked />
+                  <span class="control-button">
+                    <svg class="duration-icon" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+                      <ellipse cx="12" cy="23" rx="5.8" ry="4.1" transform="rotate(-24 12 23)" />
+                      <path d="M17 21V5" />
+                    </svg>
+                    <span class="visually-hidden">Quarter</span>
+                  </span>
+                </label>
+
+                <label>
+                  <input type="radio" name="clickMode" value="eighth" />
+                  <span class="control-button">
+                    <svg class="duration-icon" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+                      <ellipse cx="11" cy="23" rx="5.8" ry="4.1" transform="rotate(-24 11 23)" />
+                      <path d="M16 21V5" />
+                      <path d="M16 5c5.7 0.5 8.6 2.7 8.6 6.5 0 2.3 -1.2 4.2 -3.3 5.7" />
+                    </svg>
+                    <span class="visually-hidden">Eighth</span>
+                  </span>
                 </label>
               </div>
-            </fieldset>
-       
+            </div>
+          </div>
 
-          <label class="field sensitivity-field">
-            <span>Sens</span>
-            <input
-              id="sensitivityInput"
-              type="range"
-              min="0.2"
-              max="0.95"
-              step="0.01"
-              value="0.58"
-            />
-          </label>
+          <div class="control-group">
+            <div>Input</div>
+            <fieldset class="segmented">
+              <label>
+                <input type="radio" name="inputSource" value="tap" checked />
+                <span class="control-button">Tap</span>
+              </label>
+
+              <label>
+                <input type="radio" name="inputSource" value="mic" />
+                <span class="control-button">Mic</span>
+              </label>
+            </fieldset>
+          </div>
         </div>
 
-        <div class="control-group control-group--actions">
-          <button id="startButton" class="primary-button" type="button">
-            Start
-          </button>
-
-          <button
-            id="resetButton"
-            class="icon-button"
-            type="button"
-            title="Reset"
-          >
-            Reset
-          </button>
-
-          <button
-            id="debugToggle"
-            class="icon-button"
-            type="button"
-            title="Debug"
-          >
-            Debug
-          </button>
+        <div class="topbar-panel panel">
+          <button id="startButton" class="control-button control-button--primary" type="button">Start</button>
+          <button id="resetButton" class="control-button" type="button">Reset</button>
+          <button id="debugToggle" class="control-button" type="button">Debug</button>
         </div>
       </section>
 
+      <section class="test-panel panel" aria-label="Test hits" style="display: none;">
+        <label class="field test-mode-field">
+          <span>Hits</span>
+          <select id="testHitMode">
+            <option value="position">Pos</option>
+            <option value="ms">Ms</option>
+          </select>
+        </label>
+
+        <label class="field test-hits-field">
+          <span>Array</span>
+          <input
+            id="testHitsInput"
+            type="text"
+            spellcheck="false"
+            placeholder="[0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5]"
+          />
+        </label>
+
+        <button id="testApplyButton" class="control-button" type="button">
+          Apply
+        </button>
+
+        <button id="testClearButton" class="control-button" type="button">
+          Clear
+        </button>
+      </section>
+
       <section class="workbench">
-        <section class="timeline-panel" aria-label="Timeline">
+        <section class="timeline-panel panel" aria-label="Timeline">
           <div class="timeline-head">
             <div>
               <div id="statusLabel" class="status-label">collecting</div>
@@ -128,7 +136,7 @@
           </div>
         </section>
 
-        <section class="perform-area" aria-label="Input pad">
+        <section class="perform-area panel" aria-label="Input pad">
           <button
             id="tapPad"
             class="tap-pad"
@@ -142,16 +150,30 @@
               <span id="padLabel">Tap</span>
             </span>
           </button>
+
+          <label class="sensitivity-control">
+            <span>Sens</span>
+            <span class="sensitivity-slider">
+              <input
+                id="sensitivityInput"
+                type="range"
+                min="0.2"
+                max="0.95"
+                step="0.01"
+                value="0.58"
+              />
+            </span>
+          </label>
         </section>
       </section>
 
       <aside
         id="debugPanel"
-        class="debug-panel"
+        class="debug-panel panel"
         aria-label="Debug panel"
       ></aside>
     </main>
 
-    <script type="module" src="./src/app.js"></script>
+    <script type="module" src="./src/app.js?v=33"></script>
   </body>
 </html>

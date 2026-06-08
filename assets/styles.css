@@ -787,7 +787,7 @@ select {
   }
 
   .app-shell {
-    height: 100dvh;
+    height: 100svh;
     padding: 8px;
     gap: 8px;
     overflow: hidden;
@@ -814,7 +814,7 @@ select {
   }
 
   .timeline-panel {
-    flex: 0 0 128px;
+    flex: 0 0 112px;
     padding: 8px;
   }
 
@@ -823,22 +823,22 @@ select {
   }
 
   .timeline-segments {
-    height: 86px;
+    height: 72px;
   }
 
   .perform-area {
-    flex: 1 1 auto;
+    flex: 1 1 0;
     padding: 8px;
     overflow: hidden;
   }
 
   .tap-pad {
-    width: 250px;
-    height: 250px;
+    width: min(230px, calc(100vw - 130px), 26svh);
+    height: min(230px, calc(100vw - 130px), 26svh);
   }
 
   .debug-panel {
-    flex: 0 0 260px;
+    flex: 0 0 150px;
     padding: 6px;
     gap: 0;
   }
@@ -850,20 +850,20 @@ select {
 
 @media (max-width: 760px) and (max-height: 650px) {
   .timeline-panel {
-    flex-basis: 104px;
+    flex-basis: 96px;
   }
 
   .timeline-segments {
-    height: 68px;
+    height: 60px;
   }
 
   .tap-pad {
-    width: 220px;
-    height: 220px;
+    width: min(200px, calc(100vw - 130px), 24svh);
+    height: min(200px, calc(100vw - 130px), 24svh);
   }
 
   .debug-panel {
-    flex-basis: 92px;
+    flex-basis: 120px;
   }
 }
 

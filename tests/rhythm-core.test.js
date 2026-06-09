@@ -1,7 +1,76 @@
 import assert from "node:assert/strict";
-import { analyzeRhythm } from "../src/rhythm-core.js";
+import { classifyDuration } from "../src/durations.js";
+import { getMeterConfig, getPassDurationMs } from "../src/meter.js";
+import { positionFromHitMs, sanitizeHits } from "../src/pass-utils.js";
+import { analyzePass, analyzeRhythm, comparePasses } from "../src/rhythm-core.js";
 
 const tests = [];
+
+test("getPassDurationMs for 4/4 and 6/8", () => {
+  assert.equal(getPassDurationMs(getMeterConfig("4/4"), 120), 2000);
+  assert.equal(getPassDurationMs(getMeterConfig("6/8"), 120), 1000);
+});
+
+test("sanitizeHits snaps early hits, removes duplicates, and drops out-of-pass hits", () => {
+  const hits = [-200, -40, 0, 25, 250, 2100];
+  assert.deepEqual(sanitizeHits(hits, 2000), [0, 250]);
+  assert.deepEqual(hits, [-200, -40, 0, 25, 250, 2100]);
+});
+
+test("positionFromHitMs converts milliseconds to meter positions", () => {
+  assert.equal(positionFromHitMs(500, 2000, getMeterConfig("4/4")), 1);
+  assert.equal(positionFromHitMs(300, 1800, getMeterConfig("6/8")), 1);
+});
+
+test("classifyDuration for 4/4 and 6/8", () => {
+  const fourFour = getMeterConfig("4/4");
+  const sixEight = getMeterConfig("6/8");
+
+  assert.equal(classifyDuration(1, fourFour).duration, "quarter");
+  assert.equal(classifyDuration(0.5, fourFour).duration, "eighth");
+  assert.equal(classifyDuration(1 / 3, fourFour).duration, "eighthTriplet");
+  assert.equal(classifyDuration(1, sixEight).duration, "eighth");
+  assert.equal(classifyDuration(3, sixEight).duration, "dottedQuarter");
+});
+
+test("analyzePass straight quarters", () => {
+  const analyzed = analyzePass(pass(1, 2000, [0, 500, 1000, 1500]), getMeterConfig("4/4"));
+  assert.deepEqual(durations(analyzed), Array(4).fill("quarter"));
+});
+
+test("analyzePass straight eighths", () => {
+  const analyzed = analyzePass(
+    pass(1, 2000, [0, 250, 500, 750, 1000, 1250, 1500, 1750]),
+    getMeterConfig("4/4")
+  );
+  assert.deepEqual(durations(analyzed), Array(8).fill("eighth"));
+});
+
+test("analyzePass triplets in 4/4", () => {
+  const analyzed = analyzePass(
+    pass(1, 3000, [0, 250, 500, 750, 1000, 1250, 1500, 1750, 2000, 2250, 2500, 2750]),
+    getMeterConfig("4/4")
+  );
+  assert.deepEqual(durations(analyzed), Array(12).fill("eighthTriplet"));
+});
+
+test("analyzePass accepts uneven hits inside tolerance", () => {
+  const analyzed = analyzePass(
+    pass(1, 2000, [0, 260, 505, 755, 1010, 1260, 1490, 1760]),
+    getMeterConfig("4/4")
+  );
+  assert.deepEqual(durations(analyzed), Array(8).fill("eighth"));
+});
+
+test("comparePasses direct similarity", () => {
+  const meter = getMeterConfig("4/4");
+  const reference = analyzePass(pass(1, 2000, [0, 500, 1000, 1500]), meter);
+  const similar = analyzePass(pass(2, 2000, [0, 502, 1005, 1498]), meter);
+  const different = analyzePass(pass(3, 2000, [0, 250, 500, 750, 1000, 1250, 1500, 1750]), meter);
+
+  assert.ok(comparePasses(reference, similar, 0.12) > 0.9);
+  assert.ok(comparePasses(reference, different, 0.12) < 0.65);
+});
 
 test("empty input", () => {
   const result = analyzeRhythm({ meter: "4/4", passes: [] });

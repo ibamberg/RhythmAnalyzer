@@ -1,6 +1,6 @@
 import { APP_CONFIG } from "./config.js";
 
-export function renderDebugPanel(container, passes, analyzeResult, runtimeDebug = {}) {
+export function renderDebugPanel(container, passes, analyzeResult) {
   const analyzedByIndex = new Map(analyzeResult.passes.map((pass) => [pass.index, pass]));
   const recordedPasses = passes
     .filter((pass) => Array.isArray(pass.hitsMs) && pass.hitsMs.length > 0)
@@ -8,7 +8,7 @@ export function renderDebugPanel(container, passes, analyzeResult, runtimeDebug 
   const referencePass = getReferencePass(recordedPasses, analyzedByIndex, analyzeResult);
 
   container.innerHTML = `
-    ${renderSummary(analyzeResult, recordedPasses.length, referencePass, runtimeDebug)}
+    ${renderSummary(analyzeResult, recordedPasses.length, referencePass)}
     ${renderDebugMatrix(recordedPasses, analyzedByIndex, referencePass)}
   `;
 
@@ -18,7 +18,7 @@ export function renderDebugPanel(container, passes, analyzeResult, runtimeDebug 
   }
 }
 
-function renderSummary(result, passCount, referencePass, runtimeDebug) {
+function renderSummary(result, passCount, referencePass) {
   return `
     <section class="debug-panel__summary">
       <div class="debug-summary-row">
@@ -152,18 +152,6 @@ function formatConfidence(value) {
 
 function formatMs(value) {
   return Number.isFinite(value) ? value.toFixed(3) : "";
-}
-
-function formatCompactMs(value) {
-  return Number.isFinite(value) ? `${value.toFixed(0)}ms` : "--";
-}
-
-function formatLastEvent(events = []) {
-  const event = events[events.length - 1];
-  if (!event) {
-    return "no debug events";
-  }
-  return event.message;
 }
 
 function formatDelta(value) {

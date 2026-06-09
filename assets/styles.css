@@ -51,7 +51,7 @@ select {
 }
 
 /* ==========================================================================
-   App
+   Приложение
    ========================================================================== */
 
 .app-shell {
@@ -65,7 +65,7 @@ select {
 }
 
 /* ==========================================================================
-   Topbar
+   Верхняя панель
    ========================================================================== */
 
 .topbar {
@@ -148,7 +148,13 @@ select {
   height: 30px;
   padding: 0;
   appearance: none;
-  background: linear-gradient(to right, #58d6b2 0%, #58d6b2 50%, #31393c 50%, #31393c 100%) center / 100% 4px no-repeat;
+  background: linear-gradient(
+    to right,
+    #58d6b2 0%,
+    #58d6b2 var(--sensitivity-fill, 50%),
+    #31393c var(--sensitivity-fill, 50%),
+    #31393c 100%
+  ) center / 100% 4px no-repeat;
   cursor: pointer;
   transform: translate(-50%, -50%) rotate(-90deg);
 }
@@ -314,7 +320,7 @@ select {
 }
 
 /* ==========================================================================
-   Main workbench
+   Рабочая область
    ========================================================================== */
 
 .workbench {
@@ -344,7 +350,7 @@ select {
 }
 
 /* ==========================================================================
-   Timeline
+   Таймлайн
    ========================================================================== */
 
 .timeline-head {
@@ -368,23 +374,6 @@ select {
 .message-label {
   margin-top: 4px;
   color: #98a19a;
-}
-
-.mic-warning {
-  flex: 0 0 auto;
-  margin-top: -2px;
-  padding: 5px 8px;
-
-  border: 1px solid #f0b84b;
-  border-radius: 7px;
-  background: #191711;
-  color: #f9e7ad;
-
-  line-height: 1.2;
-}
-
-.mic-warning.is-hidden {
-  display: none;
 }
 
 .confidence-label {
@@ -425,22 +414,6 @@ select {
 .beat-marker.is-strong {
   width: 2px;
   background: #8b6f33;
-}
-
-.beat-marker span,
-.beat-marker strong {
-  position: absolute;
-  top: 7px;
-  left: 6px;
-}
-
-.beat-marker span {
-  color: #98a19a;
-}
-
-.beat-marker strong {
-  color: #f0b84b;
-  font-weight: 800;
 }
 
 .timeline-segments {
@@ -518,7 +491,7 @@ select {
 }
 
 /* ==========================================================================
-   Tap pad
+   Пэд
    ========================================================================== */
 
 .tap-pad {
@@ -605,8 +578,10 @@ select {
 }
 
 .tap-pad.is-listening .inner-core {
+  border-color: #54c7e8;
   background: rgba(84, 199, 232, 0.16);
   color: #54c7e8;
+  box-shadow: 0 12px 42px rgba(84, 199, 232, 0.32);
 }
 
 .tap-pad.is-hit .outer-ring {
@@ -618,7 +593,7 @@ select {
 }
 
 /* ==========================================================================
-   Debug
+   Отладка
    ========================================================================== */
 
 .debug-panel {
@@ -777,7 +752,7 @@ select {
 }
 
 /* ==========================================================================
-   Phone layout
+   Телефон
    ========================================================================== */
 
 @media (max-width: 760px) {
@@ -868,7 +843,7 @@ select {
 }
 
 /* ==========================================================================
-   Small landscape only
+   Маленький горизонтальный экран
    ========================================================================== */
 
 @media (max-height: 560px) and (orientation: landscape) {
@@ -924,10 +899,6 @@ select {
 
   .message-label {
     margin-top: 3px;
-  }
-
-  .mic-warning {
-    padding: 4px 6px;
   }
 
   .confidence-label {

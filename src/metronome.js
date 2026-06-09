@@ -1,24 +1,22 @@
 import {
-  getClickPositions,
+  getMetronomeClickUnits,
   getMeterConfig,
   getPassDurationMs,
   isStrongPosition
-} from "./config.js";
+} from "./meter.js";
 
 const LOOKAHEAD_MS = 25;
 const SCHEDULE_AHEAD_SECONDS = 0.14;
 const CLICK_NOISE_SECONDS = 0.018;
 
 export class Metronome {
-  constructor({ onPassStart = () => {}, onTick = () => {} } = {}) {
+  constructor({ onPassStart = () => {} } = {}) {
     this.onPassStart = onPassStart;
-    this.onTick = onTick;
     this.audioContext = null;
     this.timerId = null;
     this.boundaryTimerId = null;
     this.isRunning = false;
     this.lastEmittedPassIndex = -1;
-    this.lastScheduledClickPerfMs = null;
   }
 
   async ensureAudioReady() {
@@ -40,7 +38,7 @@ export class Metronome {
     this.settings = normalizeSettings(settings);
     this.meter = getMeterConfig(this.settings.meter);
     this.passDurationMs = getPassDurationMs(this.meter, this.settings.bpm);
-    this.clickPositions = getClickPositions(this.meter, this.settings.clickMode);
+    this.clickPositions = getMetronomeClickUnits(this.meter, this.settings.clickMode);
 
     await this.ensureAudioReady();
 
@@ -50,7 +48,6 @@ export class Metronome {
     this.nextClickIndex = 0;
     this.nextClickTime = this.startAudioTime;
     this.lastEmittedPassIndex = -1;
-    this.lastScheduledClickPerfMs = null;
     this.isRunning = true;
 
     this.timerId = window.setInterval(() => this.scheduler(), LOOKAHEAD_MS);
@@ -86,10 +83,6 @@ export class Metronome {
     };
   }
 
-  getAudioState() {
-    return this.audioContext?.state || "not-created";
-  }
-
   getNearestClickTime(atPerfMs = performance.now()) {
     if (!this.settings || !this.clickPositions?.length || !Number.isFinite(this.startPerfMs)) {
       return null;
@@ -118,31 +111,6 @@ export class Metronome {
     return nearestTime;
   }
 
-  getLastClickTime(atPerfMs = performance.now()) {
-    if (!this.settings || !this.clickPositions?.length || !Number.isFinite(this.startPerfMs)) {
-      return null;
-    }
-
-    const elapsedMs = atPerfMs - this.startPerfMs;
-    const currentPassIndex = Math.max(0, Math.floor(Math.max(0, elapsedMs) / this.passDurationMs));
-    let lastClickTime = null;
-
-    for (const passIndex of [currentPassIndex - 1, currentPassIndex]) {
-      if (passIndex < 0) {
-        continue;
-      }
-
-      for (const position of this.clickPositions) {
-        const clickTime = this.getClickPerfTime(passIndex, position);
-        if (clickTime <= atPerfMs && (lastClickTime === null || clickTime > lastClickTime)) {
-          lastClickTime = clickTime;
-        }
-      }
-    }
-
-    return lastClickTime;
-  }
-
   scheduler() {
     if (!this.isRunning || !this.audioContext) {
       return;
@@ -153,17 +121,9 @@ export class Metronome {
       this.audioContext.currentTime + SCHEDULE_AHEAD_SECONDS
     ) {
       const click = this.getClickAtIndex(this.nextClickIndex);
-      this.lastScheduledClickPerfMs = this.startPerfMs + click.offsetMs;
       if (this.settings.soundEnabled) {
         this.scheduleClick(this.nextClickTime, click.strong);
       }
-      this.onTick({
-        passIndex: click.passIndex,
-        position: click.position,
-        strong: click.strong,
-        time: this.nextClickTime,
-        perfTimeMs: this.lastScheduledClickPerfMs
-      });
 
       this.nextClickIndex += 1;
       const nextClick = this.getClickAtIndex(this.nextClickIndex);
@@ -200,8 +160,6 @@ export class Metronome {
     const unitMs = this.passDurationMs / this.meter.unitsPerPass;
 
     return {
-      passIndex,
-      position,
       offsetMs: passIndex * this.passDurationMs + position * unitMs,
       strong: isStrongPosition(this.meter, position)
     };

@@ -3,10 +3,8 @@ import { APP_CONFIG } from "./config.js";
 const PROCESSOR_BUFFER_SIZE = 1024;
 
 export class MicrophoneOnsetDetector {
-  constructor({ onOnset = () => {}, onLevel = () => {}, onDebug = () => {} } = {}) {
+  constructor({ onOnset = () => {} } = {}) {
     this.onOnset = onOnset;
-    this.onLevel = onLevel;
-    this.onDebug = onDebug;
     this.config = { ...APP_CONFIG.input };
     this.isRunning = false;
     this.lastOnsetAtMs = 0;
@@ -98,9 +96,6 @@ export class MicrophoneOnsetDetector {
       ? this.contextPerfOffsetMs + event.playbackTime * 1000
       : performance.now() - bufferDurationMs;
     const onsetTimeMs = bufferStartMs + (frame.peakIndex / sampleRate) * 1000;
-
-    this.onLevel(frame);
-    this.onDebug(frame);
 
     const enoughTimePassed = onsetTimeMs - this.lastOnsetAtMs >= this.config.micMinIntervalMs;
     const transientWithoutLoudness = frame.onsetScore > frame.threshold * 1.35;

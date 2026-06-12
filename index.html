@@ -4,8 +4,8 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Rhythm Analyzer</title>
-    <link rel="icon" href="data:," />
-    <link rel="stylesheet" href="./assets/styles.css?v=32" />
+    <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg" />
+    <link rel="stylesheet" href="./assets/styles.css" />
   </head>
 
   <body>
@@ -13,7 +13,7 @@
       <section class="topbar" aria-label="Controls">
         <div class="topbar-panel panel">
           <div class="control-group">
-            <div for="meterSelect">Size</div>
+            <label for="meterSelect">Size</label>
             <select id="meterSelect">
               <option value="4/4">4/4</option>
               <option value="6/8">6/8</option>
@@ -25,7 +25,7 @@
           </div>
 
           <div class="control-group">
-            <div class="field bpm-field" for="bpmInput">BPM</div>
+            <label class="field bpm-field" for="bpmInput">BPM</label>
             <input id="bpmInput" type="number" min="40" max="240" value="100" />
           </div>
         </div>
@@ -85,11 +85,12 @@
         <div class="topbar-panel panel">
           <button id="startButton" class="control-button control-button--primary" type="button">Start</button>
           <button id="resetButton" class="control-button" type="button">Reset</button>
+          <button id="calibrateButton" class="control-button" type="button" title="Calibrate latency: tap along with the click">Sync</button>
           <button id="debugToggle" class="control-button" type="button">Debug</button>
         </div>
       </section>
 
-      <section class="test-panel panel" aria-label="Test hits" style="display: none;">
+      <section id="testPanel" class="test-panel panel" aria-label="Test hits">
         <label class="field test-mode-field">
           <span>Hits</span>
           <select id="testHitMode">
@@ -152,19 +153,41 @@
             </span>
           </button>
 
-          <label class="sensitivity-control">
-            <span>Sens</span>
-            <span class="sensitivity-slider">
+          <div class="pad-controls">
+            <div id="micLevelControl" class="pad-control level-control is-inactive" aria-hidden="true">
+              <span>Lvl</span>
+              <span class="level-meter">
+                <span id="micLevelFill" class="level-meter-fill"></span>
+                <span id="micLevelThreshold" class="level-meter-threshold"></span>
+              </span>
+            </div>
+
+            <label class="pad-control sensitivity-control">
+              <span>Sens</span>
               <input
                 id="sensitivityInput"
+                class="fill-slider"
                 type="range"
                 min="0.2"
                 max="0.95"
                 step="0.01"
                 value="0.58"
               />
-            </span>
-          </label>
+            </label>
+
+            <label class="pad-control volume-control" title="Metronome volume">
+              <span>Vol</span>
+              <input
+                id="volumeInput"
+                class="fill-slider"
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value="0.7"
+              />
+            </label>
+          </div>
         </section>
       </section>
 
@@ -175,6 +198,6 @@
       ></aside>
     </main>
 
-    <script type="module" src="./src/app.js?v=35"></script>
+    <script type="module" src="./src/app.js"></script>
   </body>
 </html>

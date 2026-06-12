@@ -1,5 +1,5 @@
-import { classifyDuration } from "./durations.js";
 import { getBeatBoundaries, getMeterConfig } from "./meter.js";
+import { clamp, round } from "./utils.js";
 
 // Модель для таймлайна: только данные, без чтения или записи DOM.
 export function buildTimelineModel(analyzeResult) {
@@ -48,8 +48,8 @@ function buildBeatMarkers(meter) {
 }
 
 // Возвращает HTML/SVG строку нотной дорожки; DOM здесь не трогаем.
-export function renderSongsterrRhythm(segments, meterUnits, meterUnitName, rhythmBoundaries, rhythmWidth) {
-  const notes = buildRhythmNotes(segments, meterUnits, meterUnitName, rhythmBoundaries, rhythmWidth);
+export function renderSongsterrRhythm(segments, meterUnits, rhythmBoundaries, rhythmWidth) {
+  const notes = buildRhythmNotes(segments, meterUnits, rhythmBoundaries, rhythmWidth);
   const stems = notes
     .filter((note) => note.stem)
     .map((note) => renderRhythmStem(note, rhythmWidth))
@@ -75,15 +75,11 @@ export function renderSongsterrRhythm(segments, meterUnits, meterUnitName, rhyth
   `;
 }
 
-function buildRhythmNotes(segments, meterUnits, meterUnitName, rhythmBoundaries, rhythmWidth) {
-  const displaySegments = buildDisplayRhythmSegments(
-    segments,
-    meterUnits,
-    meterUnitName,
-    rhythmBoundaries
-  );
-
-  return displaySegments.map((segment) => {
+// Элементы из rhythm-core всегда лежат внутри одной битовой группы
+// (buildNoteElements режет окна по границам), поэтому сегменты не требуют
+// разрезания — только перевод в экранные координаты.
+function buildRhythmNotes(segments, meterUnits, rhythmBoundaries, rhythmWidth) {
+  return segments.map((segment) => {
     const startX = positionToRhythmX(
       segment.fromPosition,
       meterUnits,
@@ -113,88 +109,6 @@ function buildRhythmNotes(segments, meterUnits, meterUnitName, rhythmBoundaries,
       dotted: info.dotted
     };
   });
-}
-
-function buildDisplayRhythmSegments(segments, meterUnits, meterUnitName, rhythmBoundaries) {
-  const boundaries = Array.isArray(rhythmBoundaries) && rhythmBoundaries.length
-    ? rhythmBoundaries
-    : [0, meterUnits];
-  let fallbackPosition = 0;
-
-  return segments.flatMap((segment, sourceIndex) => {
-    const sourceFrom = Number.isFinite(segment.fromPosition)
-      ? segment.fromPosition
-      : fallbackPosition;
-    const sourceTo = Number.isFinite(segment.toPosition)
-      ? segment.toPosition
-      : sourceFrom + segment.value;
-    const pieces = [];
-    let fromPosition = sourceFrom;
-
-    fallbackPosition = sourceTo;
-
-    if (isOnRhythmBoundary(sourceFrom, boundaries) && sourceTo <= meterUnits + 0.0001) {
-      return [
-        {
-          ...segment,
-          sourceIndex,
-          duration: segment.duration || getDisplayDuration(sourceTo - sourceFrom, meterUnitName),
-          value: Math.max(0, sourceTo - sourceFrom),
-          fromPosition: sourceFrom,
-          toPosition: sourceTo,
-          isContinuation: false,
-          continuesToNext: false
-        }
-      ];
-    }
-
-    while (fromPosition < sourceTo - 0.0001) {
-      const boundary = getNextRhythmBoundary(fromPosition, boundaries, meterUnits);
-      const toPosition = Math.min(sourceTo, boundary);
-      const value = Math.max(0, toPosition - fromPosition);
-
-      if (value > 0.0001) {
-        pieces.push({
-          ...segment,
-          sourceIndex,
-          duration: isOriginalPiece(fromPosition, toPosition, sourceFrom, sourceTo) && segment.duration
-            ? segment.duration
-            : getDisplayDuration(value, meterUnitName),
-          value,
-          fromPosition,
-          toPosition,
-          isContinuation: fromPosition > sourceFrom + 0.0001,
-          continuesToNext: toPosition < sourceTo - 0.0001
-        });
-      }
-
-      fromPosition = toPosition;
-    }
-
-    return pieces;
-  });
-}
-
-function getNextRhythmBoundary(position, boundaries, meterUnits) {
-  const epsilon = 0.0001;
-  const nextBoundary = boundaries.find((boundary) => boundary > position + epsilon);
-  return nextBoundary ?? meterUnits;
-}
-
-function isOnRhythmBoundary(position, boundaries) {
-  const epsilon = 0.0001;
-  return boundaries.some((boundary) => Math.abs(boundary - position) < epsilon);
-}
-
-function isOriginalPiece(fromPosition, toPosition, sourceFrom, sourceTo) {
-  return (
-    Math.abs(fromPosition - sourceFrom) < 0.0001 &&
-    Math.abs(toPosition - sourceTo) < 0.0001
-  );
-}
-
-function getDisplayDuration(value, meterUnitName) {
-  return classifyDuration(value, { unitName: meterUnitName }).duration;
 }
 
 function positionToRhythmX(position, meterUnits, rhythmBoundaries, edge = "start", width = 1000) {
@@ -418,11 +332,3 @@ function isTripletDuration(duration) {
   return String(duration).includes("Triplet");
 }
 
-function clamp(value, min, max) {
-  return Math.min(max, Math.max(min, value));
-}
-
-function round(value, decimals) {
-  const factor = 10 ** decimals;
-  return Math.round((value + Number.EPSILON) * factor) / factor;
-}

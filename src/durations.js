@@ -1,4 +1,5 @@
 import { APP_CONFIG } from "./config.js";
+import { clamp } from "./utils.js";
 
 const EPSILON = 0.000001;
 
@@ -71,6 +72,3 @@ export function classifyDuration(value, meter, tolerance = APP_CONFIG.analysis.a
   };
 }
 
-function clamp(value, min, max) {
-  return Math.min(max, Math.max(min, value));
-}

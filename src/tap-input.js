@@ -1,7 +1,9 @@
+const FORM_TAGS = new Set(["INPUT", "SELECT", "TEXTAREA"]);
+
 export function bindTapInput({ element, onTap, onVisualHit }) {
   const handlePointerDown = (event) => {
     event.preventDefault();
-    onTap(performance.now());
+    onTap();
     onVisualHit();
   };
 
@@ -9,8 +11,12 @@ export function bindTapInput({ element, onTap, onVisualHit }) {
     if (event.code !== "Space") {
       return;
     }
+    // Не перехватываем пробел, пока пользователь печатает в поле ввода
+    if (FORM_TAGS.has(document.activeElement?.tagName)) {
+      return;
+    }
     event.preventDefault();
-    onTap(performance.now());
+    onTap();
     onVisualHit();
   };
 

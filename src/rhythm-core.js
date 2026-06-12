@@ -8,6 +8,7 @@ import {
   quantizePosition,
   sanitizeHits
 } from "./pass-utils.js";
+import { clamp, round } from "./utils.js";
 
 const EPSILON = 0.000001;
 
@@ -21,7 +22,7 @@ export function analyzeRhythm(input) {
     return buildCollectingResult(meter, analyzedPasses);
   }
 
-  const tolerance = calculateAdaptiveTolerance(analyzedPasses, APP_CONFIG.analysis);
+  const tolerance = calculateAdaptiveTolerance(analyzedPasses, meter);
   const referencePass = findReferencePass(analyzedPasses, tolerance);
   const comparedPasses = comparePassesToReference(analyzedPasses, referencePass, tolerance);
 
@@ -88,22 +89,15 @@ function buildNoteElements(normalizedHits, meter, passDurationMs, tolerance) {
   return elements;
 }
 
-function calculateAdaptiveTolerance(passes, baseConfig = APP_CONFIG.analysis) {
+function calculateAdaptiveTolerance(passes, meter) {
   if (!passes.length) {
-    return baseConfig.adaptiveToleranceRatio;
+    return APP_CONFIG.analysis.adaptiveToleranceRatio;
   }
 
-  const meterUnits = Math.max(...passes.map((pass) => pass.normalizedHits.at(-1)?.position || 1));
-  const averageDuration =
-    passes.reduce((sum, pass) => sum + pass.durationMs, 0) / Math.max(1, passes.length);
-  const timeToleranceAsPosition =
-    (baseConfig.hitToleranceMs / Math.max(1, averageDuration)) * Math.max(1, meterUnits);
+  const averageDurationMs =
+    passes.reduce((sum, pass) => sum + pass.durationMs, 0) / passes.length;
 
-  return clamp(
-    Math.max(baseConfig.adaptiveToleranceRatio, timeToleranceAsPosition),
-    baseConfig.adaptiveToleranceRatio,
-    0.28
-  );
+  return getPositionTolerance(averageDurationMs, meter.unitsPerPass);
 }
 
 // Сравнивает два проанализированных прохода по привязанным позициям и возвращает 0..1.
@@ -344,11 +338,3 @@ function getTripletDuration(value) {
   return match?.[0] || null;
 }
 
-function clamp(value, min, max) {
-  return Math.min(max, Math.max(min, value));
-}
-
-function round(value, decimals) {
-  const factor = 10 ** decimals;
-  return Math.round((value + Number.EPSILON) * factor) / factor;
-}

@@ -98,11 +98,14 @@ select {
 
 .test-panel {
   flex: 0 0 auto;
-  height: 46px;
-  padding: 6px;
+  padding: 10px;
   display: flex;
   align-items: flex-end;
   gap: 6px;
+}
+
+.test-panel.is-hidden {
+  display: none;
 }
 
 .test-mode-field {
@@ -139,34 +142,33 @@ select {
   color: #f2f4ef;
 }
 
-#sensitivityInput {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-
-  width: 150px;
+.fill-slider {
   height: 30px;
   padding: 0;
   appearance: none;
   background: linear-gradient(
     to right,
     #58d6b2 0%,
-    #58d6b2 var(--sensitivity-fill, 50%),
-    #31393c var(--sensitivity-fill, 50%),
+    #58d6b2 var(--slider-fill, 50%),
+    #31393c var(--slider-fill, 50%),
     #31393c 100%
   ) center / 100% 4px no-repeat;
   cursor: pointer;
-  transform: translate(-50%, -50%) rotate(-90deg);
 }
 
-#sensitivityInput::-webkit-slider-runnable-track {
+.fill-slider:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.fill-slider::-webkit-slider-runnable-track {
   width: 100%;
   height: 4px;
   border-radius: 999px;
   background: transparent;
 }
 
-#sensitivityInput::-webkit-slider-thumb {
+.fill-slider::-webkit-slider-thumb {
   width: 12px;
   height: 12px;
   margin-top: -4px;
@@ -177,20 +179,20 @@ select {
   appearance: none;
 }
 
-#sensitivityInput::-moz-range-track {
+.fill-slider::-moz-range-track {
   width: 100%;
   height: 4px;
   border-radius: 999px;
   background: transparent;
 }
 
-#sensitivityInput::-moz-range-progress {
+.fill-slider::-moz-range-progress {
   height: 4px;
   border-radius: 999px;
   background: #58d6b2;
 }
 
-#sensitivityInput::-moz-range-thumb {
+.fill-slider::-moz-range-thumb {
   width: 12px;
   height: 12px;
   border: 2px solid #15191c;
@@ -343,9 +345,10 @@ select {
   flex: 0 0 330px;
   padding: 8px;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 18px;
+  gap: 16px;
   overflow: hidden;
 }
 
@@ -511,25 +514,78 @@ select {
   touch-action: manipulation;
 }
 
-.sensitivity-control {
-  width: 42px;
-  height: 210px;
+.pad-controls {
+  width: min(280px, 100%);
   display: flex;
   flex-direction: column;
+  gap: 10px;
+}
+
+.pad-control {
+  display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 12px;
+  gap: 10px;
 
   color: #f2f4ef;
   font-weight: 700;
   line-height: 1;
 }
 
-.sensitivity-slider {
+.pad-control > span:first-child {
+  flex: 0 0 38px;
+}
+
+.pad-control input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.level-control.is-inactive {
+  visibility: hidden;
+}
+
+/* Метр уровня повторяет вид .fill-slider: дорожка 4px тех же цветов */
+.level-meter {
   position: relative;
-  width: 30px;
-  height: 150px;
-  display: block;
+  flex: 1 1 auto;
+  height: 30px;
+}
+
+.level-meter::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 4px;
+  margin-top: -2px;
+  border-radius: 999px;
+  background: #31393c;
+}
+
+/* Текущий уровень открывается clip-path слева направо */
+.level-meter-fill {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 4px;
+  margin-top: -2px;
+  border-radius: 999px;
+  background: #58d6b2;
+  clip-path: inset(0 100% 0 0);
+}
+
+/* Отметка порога: примерно с этого уровня детектор начинает ловить удары */
+.level-meter-threshold {
+  position: absolute;
+  top: 50%;
+  left: 42%;
+  width: 3px;
+  height: 12px;
+  margin: -6px 0 0 -1.5px;
+  border-radius: 2px;
+  background: #f0b84b;
 }
 
 .outer-ring,
@@ -582,6 +638,13 @@ select {
   background: rgba(84, 199, 232, 0.16);
   color: #54c7e8;
   box-shadow: 0 12px 42px rgba(84, 199, 232, 0.32);
+}
+
+.tap-pad.is-headphone-warning .outer-ring {
+  border-color: #f0b84b;
+  box-shadow:
+    0 0 18px rgba(240, 184, 75, 0.4),
+    inset 0 0 40px #1e1a0e;
 }
 
 .tap-pad.is-hit .outer-ring {
@@ -866,8 +929,7 @@ select {
   }
 
   .test-panel {
-    height: 38px;
-    padding: 4px 5px;
+    padding: 4px;
     gap: 5px;
   }
 

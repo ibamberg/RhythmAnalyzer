@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Rhythm Analyzer logo</title>
+  <desc id="desc">Minimal two-color rhythm analysis timeline with detected hits.</desc>
+  <rect width="512" height="512" rx="88" fill="#101315"/>
+  <g fill="none" stroke="#58d6b2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="92" y="118" width="328" height="276" rx="42" stroke-width="20"/>
+    <path stroke-width="18" d="M138 318h236"/>
+    <path stroke-width="12" d="M162 188v176"/>
+    <path stroke-width="12" d="M225 188v176"/>
+    <path stroke-width="12" d="M288 188v176"/>
+    <path stroke-width="12" d="M351 188v176"/>
+    <path stroke-width="16" d="M162 318v-54"/>
+    <path stroke-width="16" d="M225 318v-96"/>
+    <path stroke-width="16" d="M288 318v-42"/>
+    <path stroke-width="16" d="M351 318v-124"/>
+    <path stroke-width="15" d="M145 166h74"/>
+    <path stroke-width="15" d="M145 364h222"/>
+  </g>
+  <g fill="#58d6b2">
+    <circle cx="162" cy="264" r="17"/>
+    <circle cx="225" cy="222" r="17"/>
+    <circle cx="288" cy="276" r="17"/>
+    <circle cx="351" cy="194" r="17"/>
+  </g>
+</svg>

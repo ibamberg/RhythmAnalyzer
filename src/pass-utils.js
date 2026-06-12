@@ -1,4 +1,5 @@
 import { APP_CONFIG } from "./config.js";
+import { clamp, round } from "./utils.js";
 
 const EPSILON = 0.000001;
 
@@ -93,11 +94,3 @@ function buildQuantizationCandidates(meter) {
     .sort((a, b) => a - b);
 }
 
-function clamp(value, min, max) {
-  return Math.min(max, Math.max(min, value));
-}
-
-function round(value, decimals) {
-  const factor = 10 ** decimals;
-  return Math.round((value + Number.EPSILON) * factor) / factor;
-}

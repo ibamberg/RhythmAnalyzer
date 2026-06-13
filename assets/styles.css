@@ -143,7 +143,7 @@ select {
 }
 
 .fill-slider {
-  height: 30px;
+  height: 38px;
   padding: 0;
   appearance: none;
   background: linear-gradient(
@@ -152,8 +152,9 @@ select {
     #58d6b2 var(--slider-fill, 50%),
     #31393c var(--slider-fill, 50%),
     #31393c 100%
-  ) center / 100% 4px no-repeat;
+  ) center / 100% 6px no-repeat;
   cursor: pointer;
+  touch-action: pan-y;
 }
 
 .fill-slider:disabled {
@@ -163,16 +164,16 @@ select {
 
 .fill-slider::-webkit-slider-runnable-track {
   width: 100%;
-  height: 4px;
+  height: 6px;
   border-radius: 999px;
   background: transparent;
 }
 
 .fill-slider::-webkit-slider-thumb {
-  width: 12px;
-  height: 12px;
-  margin-top: -4px;
-  border: 2px solid #15191c;
+  width: 22px;
+  height: 22px;
+  margin-top: -8px;
+  border: 3px solid #15191c;
   border-radius: 50%;
   background: #58d6b2;
   -webkit-appearance: none;
@@ -181,21 +182,21 @@ select {
 
 .fill-slider::-moz-range-track {
   width: 100%;
-  height: 4px;
+  height: 6px;
   border-radius: 999px;
   background: transparent;
 }
 
 .fill-slider::-moz-range-progress {
-  height: 4px;
+  height: 6px;
   border-radius: 999px;
   background: #58d6b2;
 }
 
 .fill-slider::-moz-range-thumb {
-  width: 12px;
-  height: 12px;
-  border: 2px solid #15191c;
+  width: 22px;
+  height: 22px;
+  border: 3px solid #15191c;
   border-radius: 50%;
   background: #58d6b2;
 }
@@ -571,11 +572,11 @@ select {
   visibility: hidden;
 }
 
-/* Метр уровня повторяет вид .fill-slider: дорожка 4px тех же цветов */
+/* Метр уровня повторяет вид .fill-slider: дорожка 6px тех же цветов */
 .level-meter {
   position: relative;
   flex: 1 1 auto;
-  height: 30px;
+  height: 38px;
 }
 
 .level-meter::before {
@@ -584,8 +585,8 @@ select {
   left: 0;
   right: 0;
   top: 50%;
-  height: 4px;
-  margin-top: -2px;
+  height: 6px;
+  margin-top: -3px;
   border-radius: 999px;
   background: #31393c;
 }
@@ -596,8 +597,8 @@ select {
   left: 0;
   right: 0;
   top: 50%;
-  height: 4px;
-  margin-top: -2px;
+  height: 6px;
+  margin-top: -3px;
   border-radius: 999px;
   background: #58d6b2;
   clip-path: inset(0 100% 0 0);
@@ -609,8 +610,8 @@ select {
   top: 50%;
   left: 42%;
   width: 3px;
-  height: 12px;
-  margin: -6px 0 0 -1.5px;
+  height: 16px;
+  margin: -8px 0 0 -1.5px;
   border-radius: 2px;
   background: #f0b84b;
 }

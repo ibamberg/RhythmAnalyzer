@@ -1,12 +1,30 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Rhythm Analyzer">
-  <!-- Иконка повторяет пад приложения: внешнее бирюзовое кольцо,
-       среднее кольцо и янтарное ядро, плюс стрелка-метроном -->
-  <rect width="64" height="64" rx="14" fill="#101315"/>
-  <circle cx="32" cy="34" r="24" fill="none" stroke="#2c6373" stroke-width="3.5"/>
-  <circle cx="32" cy="34" r="16.5" fill="#12181a" stroke="#397d6b" stroke-width="2"/>
-  <circle cx="32" cy="34" r="9.5" fill="rgba(240, 184, 75, 0.18)" stroke="#f0b84b" stroke-width="2.5"/>
-  <g stroke="#58d6b2" stroke-linecap="round">
-    <line x1="32" y1="34" x2="45" y2="13" stroke-width="4"/>
-  </g>
-  <circle cx="32" cy="34" r="3" fill="#58d6b2"/>
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<!-- Creator: CorelDRAW -->
+<svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" width="626px" height="626px" version="1.1" style="shape-rendering:geometricPrecision; text-rendering:geometricPrecision; image-rendering:optimizeQuality; fill-rule:evenodd; clip-rule:evenodd"
+viewBox="0 0 626 626"
+ xmlns:xlink="http://www.w3.org/1999/xlink"
+ xmlns:xodm="http://www.corel.com/coreldraw/odm/2003"
+ role="img"
+ aria-label="Rhythm Analyzer">
+ <defs>
+  <style type="text/css">
+   <![CDATA[
+    .fil2 {fill:#58D6B2}
+    .fil0 {fill:#101315;fill-rule:nonzero}
+    .fil1 {fill:#58D6B2;fill-rule:nonzero}
+   ]]>
+  </style>
+ </defs>
+ <g id="Слой_x0020_1">
+  <metadata id="CorelCorpID_0Corel-Layer"/>
+  <path class="fil0" d="M136.03 0.54l351.5 0c75.51,0 136.73,61.22 136.73,136.69l0 351.54c0,75.47 -61.22,136.69 -136.73,136.69l-351.5 0c-75.51,0 -136.73,-61.22 -136.73,-136.69l0 -351.54c0,-75.47 61.22,-136.69 136.73,-136.69z"/>
+  <path class="fil1" d="M507.29 393.95c-9.63,-29.62 -48.54,-43.5 -86.94,-31.03 -38.38,12.47 -61.72,46.6 -52.1,76.22 9.63,29.6 48.56,43.5 86.94,31.04 38.41,-12.47 61.72,-46.6 52.1,-76.23z"/>
+  <path class="fil1" d="M303.12 502.68c0,-13.47 -10.93,-24.41 -24.4,-24.41 -13.5,0 -24.41,10.94 -24.41,24.41 0,13.47 10.91,24.4 24.41,24.4 13.47,0 24.4,-10.93 24.4,-24.4z"/>
+  <path class="fil2" d="M510.19 405.21c0,9.71 -7.87,17.59 -17.59,17.59 -9.69,0 -17.57,-7.88 -17.57,-17.59l0 -310.14c0,-9.72 7.88,-17.59 17.57,-17.59 9.72,0 17.59,7.87 17.59,17.59l0 310.14z"/>
+  <polygon class="fil2" points="510.19,115.98 205.62,197.61 205.62,142.04 510.16,60.45 "/>
+  <polygon class="fil1" points="507.35,199.17 368.16,236.98 368.03,195.45 496.88,160.95 "/>
+  <path class="fil1" d="M237.87 460.39c-9.59,-29.62 -48.53,-43.53 -86.94,-31.06 -38.37,12.5 -61.72,46.63 -52.09,76.22 9.62,29.63 48.56,43.53 86.94,31.03 38.4,-12.47 61.72,-46.59 52.09,-76.19z"/>
+  <path class="fil1" d="M205.62 172.58c0,-9.72 7.88,-17.6 17.57,-17.6 9.72,0 17.59,7.88 17.59,17.6l0 299.06c0,9.72 -7.88,17.6 -17.59,17.6 -9.69,0 -17.57,-7.88 -17.57,-17.6l0 -299.06z"/>
+ </g>
 </svg>

@@ -6,23 +6,15 @@ export function buildTimelineModel(analyzeResult) {
   const meter = getMeterConfig(analyzeResult.meter);
   const sourcePass =
     analyzeResult.referencePass || analyzeResult.passes[analyzeResult.passes.length - 1] || null;
-
-  if (!sourcePass || sourcePass.elements.length === 0) {
-    return {
-      status: analyzeResult.passes.length ? "collecting" : "empty",
-      segments: [],
-      beatMarkers: buildBeatMarkers(meter),
-      meterUnits: meter.unitsPerPass,
-      meterUnitName: meter.unitName,
-      rhythmBoundaries: getBeatBoundaries(meter),
-      confidence: analyzeResult.confidence
-    };
-  }
+  const hasSegments = Boolean(sourcePass && sourcePass.elements.length);
 
   return {
-    status: analyzeResult.status,
-    segments: buildTimelineSegments(sourcePass),
+    status: hasSegments
+      ? analyzeResult.status
+      : analyzeResult.passes.length ? "collecting" : "empty",
+    segments: hasSegments ? buildTimelineSegments(sourcePass) : [],
     beatMarkers: buildBeatMarkers(meter),
+    hitHeat: buildHitHeat(analyzeResult, meter),
     meterUnits: meter.unitsPerPass,
     meterUnitName: meter.unitName,
     rhythmBoundaries: getBeatBoundaries(meter),
@@ -39,6 +31,45 @@ function buildTimelineSegments(sourcePass) {
   }));
 }
 
+const HEAT_BINS = 240;
+// Ширина пятна от одного удара: σ гауссианы в бинах (~2.5% такта)
+const HEAT_SIGMA_BINS = 6;
+const HEAT_KERNEL_RADIUS = HEAT_SIGMA_BINS * 3;
+// Скорость прогрева: чем больше, тем медленнее место краснеет
+const HEAT_SATURATION = 4;
+
+// Тепловая линия ударов по всем хранимым проходам: каждый удар «греет»
+// своё место гауссовым пятном, цвет от бирюзы через янтарь к красному.
+// Насыщение мягкое (1 - e^-x): пик остаётся скруглённым, без плоской
+// красной «шапки» с резкими краями.
+function buildHitHeat(analyzeResult, meter) {
+  const bins = new Array(HEAT_BINS).fill(0);
+
+  for (const pass of analyzeResult.passes) {
+    for (const hit of pass.normalizedHits) {
+      const center = (hit.position / meter.unitsPerPass) * HEAT_BINS;
+      const start = Math.max(0, Math.floor(center - HEAT_KERNEL_RADIUS));
+      const end = Math.min(HEAT_BINS - 1, Math.ceil(center + HEAT_KERNEL_RADIUS));
+
+      for (let bin = start; bin <= end; bin += 1) {
+        const distance = bin + 0.5 - center;
+        bins[bin] += Math.exp(-(distance * distance) / (2 * HEAT_SIGMA_BINS * HEAT_SIGMA_BINS));
+      }
+    }
+  }
+
+  return bins.map((value) => heatColor(1 - Math.exp(-value / HEAT_SATURATION)));
+}
+
+// 0 -> бирюза (#58d6b2), 0.5 -> янтарь (#f0b84b), 1 -> красный (#f06f5f)
+function heatColor(t) {
+  const from = t < 0.5 ? [0x58, 0xd6, 0xb2] : [0xf0, 0xb8, 0x4b];
+  const to = t < 0.5 ? [0xf0, 0xb8, 0x4b] : [0xf0, 0x6f, 0x5f];
+  const local = t < 0.5 ? t * 2 : (t - 0.5) * 2;
+  const channel = (index) => Math.round(from[index] + (to[index] - from[index]) * local);
+  return `rgb(${channel(0)}, ${channel(1)}, ${channel(2)})`;
+}
+
 function buildBeatMarkers(meter) {
   return Array.from({ length: meter.unitsPerPass }, (_, index) => ({
     positionPercent: round((index / meter.unitsPerPass) * 100, 4),
@@ -50,10 +81,7 @@ function buildBeatMarkers(meter) {
 // Возвращает HTML/SVG строку нотной дорожки; DOM здесь не трогаем.
 export function renderSongsterrRhythm(segments, meterUnits, rhythmBoundaries, rhythmWidth) {
   const notes = buildRhythmNotes(segments, meterUnits, rhythmBoundaries, rhythmWidth);
-  const stems = notes
-    .filter((note) => note.stem)
-    .map((note) => renderRhythmStem(note, rhythmWidth))
-    .join("");
+  const glyphs = notes.map((note) => renderRhythmNote(note, rhythmWidth)).join("");
   const beams = renderRhythmBeams(notes, rhythmWidth);
   const tuplets = renderRhythmTuplets(notes, rhythmWidth);
   const holds = notes
@@ -67,7 +95,7 @@ export function renderSongsterrRhythm(segments, meterUnits, rhythmBoundaries, rh
   return `
     <svg class="songsterr-rhythm" viewBox="0 0 ${rhythmWidth} 112" preserveAspectRatio="none" aria-hidden="true">
       ${holds}
-      ${stems}
+      ${glyphs}
       ${beams}
       ${tuplets.paths}
     </svg>
@@ -111,10 +139,7 @@ function buildRhythmNotes(segments, meterUnits, rhythmBoundaries, rhythmWidth) {
   });
 }
 
-function positionToRhythmX(position, meterUnits, rhythmBoundaries, edge = "start", width = 1000) {
-  const boundaries = Array.isArray(rhythmBoundaries) && rhythmBoundaries.length
-    ? rhythmBoundaries
-    : [0, meterUnits];
+function positionToRhythmX(position, meterUnits, boundaries, edge, width) {
   const boundaryIndex = findRhythmBoundaryIndex(position, boundaries, edge);
   const from = boundaries[boundaryIndex] ?? 0;
   const to = boundaries[boundaryIndex + 1] ?? meterUnits;
@@ -166,27 +191,23 @@ function getRhythmDurationInfo(duration) {
   return durations[duration] || durations.quarter;
 }
 
-function getBeamGroup(position, rhythmBoundaries) {
-  const boundaries = Array.isArray(rhythmBoundaries) && rhythmBoundaries.length
-    ? rhythmBoundaries
-    : [0, 1];
-  return findRhythmBoundaryIndex(position, boundaries);
+function getBeamGroup(position, boundaries) {
+  return findRhythmBoundaryIndex(position, boundaries, "start");
 }
 
-function renderRhythmStem(note, rhythmWidth) {
+// Нота: штиль без головки (Songsterr-стиль), длительность читается по
+// рёбрам у нижнего края и высоте штиля.
+function renderRhythmNote(note, rhythmWidth) {
   const x = round(clamp(note.x, 0, rhythmWidth), 3);
+  const stem = note.stem
+    ? `<line class="rhythm-stem" x1="${x}" y1="${note.stemTop}" x2="${x}" y2="${note.stemBottom}" />`
+    : "";
+  // Точка внизу у штиля, на уровне второго ребра (где полоска шестнадцатой)
   const dot = note.dotted
-    ? `<path class="rhythm-dot" d="M ${round(getRhythmDotX(note, rhythmWidth), 3)} ${round(note.stemBottom - 12, 3)} h 0.01" />`
+    ? `<circle class="rhythm-dot" cx="${round(clamp(x + 9, 0, rhythmWidth), 3)}" cy="77" r="2.6" />`
     : "";
 
-  return `
-    <line class="rhythm-stem" x1="${x}" y1="${note.stemTop}" x2="${x}" y2="${note.stemBottom}" />
-    ${dot}
-  `;
-}
-
-function getRhythmDotX(note, rhythmWidth) {
-  return clamp(note.x + 8, 0, rhythmWidth);
+  return stem + dot;
 }
 
 function renderRhythmBeams(notes, rhythmWidth) {
@@ -272,6 +293,8 @@ function renderBeamRect(fromX, toX, y, height, rhythmWidth) {
   return `<rect class="rhythm-beam" x="${round(x, 3)}" y="${y}" width="${round(Math.max(1, rightEdge - x), 3)}" height="${height}" />`;
 }
 
+// Скобка с цифрой 3 над каждой непрерывной группой триольных нот —
+// даже неполной, иначе одиночная триоль неотличима от обычной ноты.
 function renderRhythmTuplets(notes, rhythmWidth) {
   const paths = [];
   const labels = [];
@@ -292,34 +315,18 @@ function renderRhythmTuplets(notes, rhythmWidth) {
       index += 1;
     }
 
-    for (let groupStart = runStart; groupStart < index; groupStart += 1) {
-      let groupEnd = groupStart;
-      let totalValue = 0;
-      while (groupEnd < index && totalValue < 1 - 0.001) {
-        totalValue += notes[groupEnd].value;
-        groupEnd += 1;
-      }
+    const first = notes[runStart];
+    const last = notes[index - 1];
+    const left = round(clamp(first.x, 0, rhythmWidth), 3);
+    const right = round(clamp(Math.max(last.endX, last.x + 14), left + 8, rhythmWidth), 3);
+    const center = round((left + right) / 2, 3);
 
-      if (Math.abs(totalValue - 1) > 0.001 || groupEnd - groupStart < 2) {
-        groupStart = groupEnd - 1;
-        continue;
-      }
-
-      const first = notes[groupStart];
-      const last = notes[groupEnd - 1];
-      const left = round(clamp(first.x, 0, rhythmWidth), 3);
-      const right = round(clamp(last.x, 0, rhythmWidth), 3);
-      const center = round((left + right) / 2, 3);
-
-      paths.push(`
-        <path class="rhythm-tuplet" d="M ${left} 96 V 103 H ${right} V 96" />
-      `);
-      labels.push(
-        `<span class="rhythm-tuplet-number" style="left:${round((center / rhythmWidth) * 100, 4)}%">3</span>`
-      );
-
-      groupStart = groupEnd - 1;
-    }
+    paths.push(`
+      <path class="rhythm-tuplet" d="M ${left} 96 V 103 H ${right} V 96" />
+    `);
+    labels.push(
+      `<span class="rhythm-tuplet-number" style="left:${round((center / rhythmWidth) * 100, 4)}%">3</span>`
+    );
   }
 
   return {

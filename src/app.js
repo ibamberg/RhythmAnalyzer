@@ -6,7 +6,7 @@ import { Metronome } from "./metronome.js";
 import { MicrophoneOnsetDetector } from "./audio-input.js";
 import { bindTapInput } from "./tap-input.js";
 import { renderDebugPanel } from "./debug-panel.js";
-import { clamp, round } from "./utils.js";
+import { clamp, median, round } from "./utils.js";
 
 const LATENCY_STORAGE_KEY = "rhythm-analyzer.latencyOffsetMs";
 const BLEED_WARNING_COUNT = 6;
@@ -32,6 +32,7 @@ const dom = {
   messageLabel: document.querySelector("#messageLabel"),
   confidenceLabel: document.querySelector("#confidenceLabel"),
   beatMarkers: document.querySelector("#beatMarkers"),
+  hitHeat: document.querySelector("#hitHeat"),
   timelineSegments: document.querySelector("#timelineSegments"),
   playhead: document.querySelector("#playhead"),
   debugPanel: document.querySelector("#debugPanel"),
@@ -45,7 +46,7 @@ const dom = {
 const state = {
   passMap: new Map(),
   analysisResult: analyzeRhythm({ meter: "4/4", passes: [] }),
-  isDebugVisible: true,
+  isDebugVisible: false,
   inputSource: "tap",
   rafId: null,
   // { offsets: [] } во время калибровки задержки, иначе null
@@ -79,16 +80,18 @@ function nowMs() {
 }
 
 // Постоянный сдвиг между запланированной сеткой и тем, что пользователь
-// слышит и играет: откалиброванное значение, иначе задержка вывода контекста.
+// слышит и играет — ТОЛЬКО откалиброванное значение (Sync).
+// ctx.outputLatency сюда подставлять нельзя: Chrome на Windows завышает его
+// (~110 мс при реальной задержке около нуля), и автокомпенсация сдвигала
+// попадания «в клик» мимо сетки.
 function getLatencyOffsetMs() {
-  if (Number.isFinite(state.latencyOffsetMs)) {
-    return state.latencyOffsetMs;
-  }
-  return (sharedAudioContext?.outputLatency || 0) * 1000;
+  return Number.isFinite(state.latencyOffsetMs) ? state.latencyOffsetMs : 0;
 }
 
 const metronome = new Metronome({
   onPassStart: handlePassStart,
+  // Окно гейтинга асимметрично (-30..+150 мс) и само покрывает задержку
+  // вывода; ctx.outputLatency не используем — Chrome на Windows его завышает
   onClickScheduled: (time) => micDetector.noteClickScheduled(time)
 });
 
@@ -112,7 +115,7 @@ function init() {
   renderMicThreshold();
   metronome.setVolume(dom.volumeInput.value);
   updateMetronomeSoundState();
-  dom.debugToggle.classList.add("is-active");
+  // dom.debugToggle.classList.add("is-active");
 }
 
 function bindEvents() {
@@ -192,13 +195,11 @@ function bindEvents() {
     });
   }
 
-  dom.soundToggle.addEventListener("change", async () => {
+  dom.soundToggle.addEventListener("change", () => {
     updateMetronomeSoundState();
     renderPadState();
     metronome.setSoundEnabled(dom.soundToggle.checked);
     state.bleedCount = 0;
-    // AEC нужен только пока метроном звучит — пересоздаём микрофонный тракт
-    await restartMicIfRunning();
     renderApp();
   });
 
@@ -264,17 +265,19 @@ function handlePassStart(pass) {
   refreshAnalysis();
 }
 
+// Приводит микрофон в соответствие выбранному источнику ввода.
+// Во время калибровки уже работающий микрофон не трогаем — его онсеты
+// тоже считаются калибровочными тапами.
 async function syncInputSource(ctx = sharedAudioContext) {
-  if (state.inputSource !== "mic" && !state.calibration) {
-    micDetector.stop();
-    return;
-  }
   if (state.inputSource !== "mic") {
+    if (!state.calibration) {
+      micDetector.stop();
+    }
     return;
   }
 
   try {
-    await micDetector.start(ctx, { echoCancellation: dom.soundToggle.checked });
+    await micDetector.start(ctx, { echoCancellation: APP_CONFIG.input.echoCancellation });
     // Перевооружаем гейт кликами, которые уже запланированы
     for (const time of metronome.getUpcomingClickTimes()) {
       micDetector.noteClickScheduled(time);
@@ -285,13 +288,6 @@ async function syncInputSource(ctx = sharedAudioContext) {
     renderPadState();
     dom.messageLabel.textContent = "Microphone unavailable";
     console.warn(error);
-  }
-}
-
-async function restartMicIfRunning() {
-  if (state.inputSource === "mic" && micDetector.isRunning) {
-    micDetector.stop();
-    await syncInputSource();
   }
 }
 
@@ -474,12 +470,6 @@ function loadStoredLatencyOffset() {
   }
 }
 
-function median(values) {
-  const sorted = [...values].sort((a, b) => a - b);
-  const middle = Math.floor(sorted.length / 2);
-  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
-}
-
 // --- Тестовые удары -------------------------------------------------------
 
 function applyTestHits() {
@@ -567,6 +557,7 @@ function parseTestHits(rawValue) {
 function renderApp() {
   const timelineModel = buildTimelineModel(state.analysisResult);
   renderTimeline(timelineModel);
+  renderHitHeat(timelineModel);
   renderStatus(timelineModel);
   renderDebugPanel(dom.debugPanel, getPasses(), state.analysisResult);
 }
@@ -586,6 +577,7 @@ function renderTimeline(model) {
     .map(
       (marker) => `
         <div class="beat-marker ${marker.strong ? "is-strong" : ""}" style="left:${marker.positionPercent}%">
+          <span class="beat-marker__label">${marker.label}</span>
         </div>
       `
     )
@@ -601,18 +593,27 @@ function renderTimeline(model) {
     : "";
 }
 
+// Тепловая линия ударов: меняется на каждый удар, поэтому рисуется
+// отдельно от кэшируемой нотной дорожки
+function renderHitHeat(model) {
+  const lastIndex = model.hitHeat.length - 1;
+  const stops = model.hitHeat
+    .map((color, index) => `${color} ${round((index / lastIndex) * 100, 2)}%`)
+    .join(", ");
+  dom.hitHeat.style.background = `linear-gradient(to right, ${stops})`;
+}
+
+// Ширина viewBox равна ширине контейнера — координаты 1:1 с пикселями,
+// головки нот не растягиваются
 function getRhythmRenderWidth() {
   const width = Math.round(dom.timelineSegments.clientWidth);
-  if (window.matchMedia("(max-width: 760px)").matches && width > 0) {
-    return Math.max(320, width);
-  }
-
-  return 1000;
+  return width > 0 ? Math.max(320, width) : 1000;
 }
 
 function renderStatus(model) {
   dom.statusLabel.textContent = model.status;
   dom.confidenceLabel.textContent = `${Math.round(model.confidence * 100)}%`;
+  dom.confidenceLabel.classList.toggle("is-ready", model.status === "ready");
   dom.messageLabel.textContent = getStatusMessage();
 }
 
@@ -700,12 +701,15 @@ function applyMeterFill(percent) {
 }
 
 // Отметка на метре: уровень, с которого детектор начинает ловить удары.
-// Перевод порога онсет-детектора (flux-домен) в RMS-шкалу метра приближённый:
-// для перкуссивного транзиента onsetScore ~ 0.6 * пикового RMS.
+// Зеркалит формулы worklet'а (mic-processor.js не импортирует модули):
+// floor онсет-порога переведён в RMS как onsetScore ~ 0.6 * пикового RMS,
+// гейт по громкости масштабируется чувствительностью.
 function renderMicThreshold() {
   const sensitivity = Number(dom.sensitivityInput.value);
   const onsetFloor = 0.0035 + (1 - sensitivity) * 0.018;
-  const approxRms = onsetFloor / 0.6;
+  const norm = clamp((sensitivity - 0.2) / 0.75, 0, 1);
+  const gateRms = APP_CONFIG.input.noiseGate * Math.pow(0.08, norm);
+  const approxRms = Math.max(gateRms, onsetFloor / 0.6);
   dom.micLevelThreshold.style.left = `${round(levelToPercent(approxRms), 1)}%`;
 }
 

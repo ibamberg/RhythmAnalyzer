@@ -49,7 +49,7 @@ class MicrophoneOnsetProcessor extends AudioWorkletProcessor {
 
     const enoughTimePassed = onsetAudioTime - this.lastOnsetAtTime >= this.micMinIntervalSec;
     const transientWithoutLoudness = frame.onsetScore > threshold * 1.35;
-    const aboveGate = frame.energy >= this.noiseGate || transientWithoutLoudness;
+    const aboveGate = frame.energy >= this.getEffectiveGate() || transientWithoutLoudness;
 
     if (aboveGate && enoughTimePassed && frame.onsetScore > threshold) {
       // Inside a click window only an onset clearly stronger than the click
@@ -73,6 +73,14 @@ class MicrophoneOnsetProcessor extends AudioWorkletProcessor {
     }
 
     return true;
+  }
+
+  // Гейт по громкости масштабируется чувствительностью: на минимуме Sens
+  // требует ~-32 дБ, на максимуме ловит очень тихие источники (~-54 дБ).
+  // Формула продублирована в app.js (renderMicThreshold) для отметки на метре.
+  getEffectiveGate() {
+    const norm = Math.max(0, Math.min(1, (this.sensitivity - 0.2) / 0.75));
+    return this.noiseGate * Math.pow(0.08, norm);
   }
 
   isNearClick(time) {

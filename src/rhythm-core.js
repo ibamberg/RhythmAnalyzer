@@ -5,7 +5,7 @@ import {
   getPositionTolerance,
   hitMsFromPosition,
   positionFromHitMs,
-  quantizePosition,
+  quantizeHitPositions,
   sanitizeHits
 } from "./pass-utils.js";
 import { clamp, round } from "./utils.js";
@@ -214,16 +214,15 @@ function buildAnalysisResult(meter, comparedPasses, referencePass) {
 }
 
 function buildNormalizedHits(hitsMs, passDurationMs, meter) {
+  const positions = hitsMs.map((rawMs) => positionFromHitMs(rawMs, passDurationMs, meter));
+  const quantized = quantizeHitPositions(positions, meter);
+
   return dedupeQuantizedHits(
-    hitsMs.map((rawMs) => {
-      const position = positionFromHitMs(rawMs, passDurationMs, meter);
-      const quantizedPosition = quantizePosition(position, meter);
-      return {
-        rawMs: round(rawMs, 3),
-        position: round(position, 4),
-        quantizedPosition: round(quantizedPosition, 4)
-      };
-    })
+    hitsMs.map((rawMs, index) => ({
+      rawMs: round(rawMs, 3),
+      position: round(positions[index], 4),
+      quantizedPosition: round(quantized[index], 4)
+    }))
   );
 }
 
@@ -265,8 +264,11 @@ function calculatePassConfidence(normalizedHits, elements, tolerance) {
   return round(hitConfidence * 0.65 + elementConfidence * 0.35, 4);
 }
 
+// Переименовывает длительности в долях с триольной сеткой: благодаря
+// посеточной квантизации (quantizeHitPositions) доля либо целиком бинарная,
+// либо целиком триольная, поэтому заполненность доли не требуется.
 function spellTupletDurations(elements, meter) {
-  if (meter.unitName !== "quarter" || elements.length < 2) {
+  if (meter.unitName !== "quarter" || !elements.length) {
     return elements;
   }
 
@@ -282,11 +284,7 @@ function spellTupletDurations(elements, meter) {
         element.toPosition <= beatEnd + EPSILON
     );
 
-    if (beatElements.length < 2 || !fillsBeat(beatElements, beatStart, beatEnd)) {
-      continue;
-    }
-
-    if (!usesTripletGrid(beatElements, beatStart)) {
+    if (!beatElements.length || !usesTripletGrid(beatElements, beatStart)) {
       continue;
     }
 
@@ -300,15 +298,6 @@ function spellTupletDurations(elements, meter) {
   }
 
   return spelled;
-}
-
-function fillsBeat(elements, beatStart, beatEnd) {
-  const first = elements[0];
-  const last = elements[elements.length - 1];
-  return (
-    Math.abs(first.fromPosition - beatStart) < 0.001 &&
-    Math.abs(last.toPosition - beatEnd) < 0.001
-  );
 }
 
 function usesTripletGrid(elements, beatStart) {

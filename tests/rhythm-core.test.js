@@ -152,6 +152,69 @@ test("mixed triplet spelling 4/4", () => {
   ]);
 });
 
+test("no mixed binary/ternary grid within one beat", () => {
+  // 340 мс при доле 500 мс раньше квантизовался на триольную точку 2/3
+  // между бинарными соседями — получались невозможные комбинации
+  const result = analyzeRhythm({
+    meter: "4/4",
+    passes: [pass(1, 2000, [0, 125, 250, 340, 500, 1000, 1500])]
+  });
+  assert.deepEqual(
+    durations(result.passes[0]).slice(0, 4),
+    ["sixteenth", "sixteenth", "sixteenth", "sixteenth"]
+  );
+});
+
+test("stray offbeat hit does not switch the beat to ternary grid", () => {
+  // Удар на 0.82 доли — неточная «и» (0.75), а не секстоль 5/6:
+  // без удара возле 1/3 или 2/3 доля остаётся бинарной
+  const result = analyzeRhythm({
+    meter: "4/4",
+    passes: [pass(1, 2400, [0, 493, 1071, 1671])]
+  });
+  assert.deepEqual(durations(result.passes[0]), [
+    "dottedEighth",
+    "sixteenth",
+    "sixteenth",
+    "sixteenth"
+  ]);
+});
+
+test("swing pair is written binary, not as a lone triplet", () => {
+  // Два удара в долю (0 и 2/3) — это свинг, но без третьей ноты триолью
+  // не пишем: бинарная сетка, пунктир, без скобки «3».
+  const result = analyzeRhythm({
+    meter: "4/4",
+    passes: [pass(1, 2000, [0, 333, 500, 833])]
+  });
+  const durs = durations(result.passes[0]);
+  assert.ok(!durs.some((duration) => duration.includes("Triplet")), durs.join(","));
+  assert.deepEqual(durs, ["dottedEighth", "sixteenth", "dottedEighth", "sixteenth"]);
+});
+
+test("three notes in one beat are spelled as a triplet", () => {
+  const result = analyzeRhythm({
+    meter: "4/4",
+    passes: [pass(1, 4000, [0, 333, 667, 1000])]
+  });
+  assert.deepEqual(durations(result.passes[0]).slice(0, 3), [
+    "eighthTriplet",
+    "eighthTriplet",
+    "eighthTriplet"
+  ]);
+});
+
+test("dense near-even tapping does not get spurious triplets", () => {
+  // ~4 равномерных удара на долю с шагом ~0.28 чуть лучше ложатся на
+  // триольную сетку, но не настолько, чтобы заслужить скобку «3»
+  const result = analyzeRhythm({
+    meter: "4/4",
+    passes: [pass(1, 2400, [0, 152, 323, 502, 683, 862, 1043, 1243])]
+  });
+  const durs = durations(result.passes[0]);
+  assert.ok(!durs.some((duration) => duration.includes("Triplet")), durs.join(","));
+});
+
 test("analysis windows stop at beat boundaries", () => {
   const result = analyzeRhythm({
     meter: "4/4",

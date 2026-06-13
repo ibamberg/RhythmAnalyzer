@@ -383,9 +383,13 @@ select {
   flex: 0 0 auto;
   min-width: 62px;
   text-align: right;
-  color: #58d6b2;
+  color: #5e686b;
   font-weight: 900;
   line-height: 1;
+}
+
+.confidence-label.is-ready {
+  color: #58d6b2;
 }
 
 .timeline {
@@ -417,6 +421,33 @@ select {
 .beat-marker.is-strong {
   width: 2px;
   background: #8b6f33;
+}
+
+.beat-marker__label {
+  position: absolute;
+  top: 4px;
+  left: 5px;
+  color: #4b565a;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.beat-marker.is-strong .beat-marker__label {
+  color: #8b6f33;
+}
+
+/* Тепловая линия ударов: чем чаще бьют в место, тем оно краснее */
+.hit-heat {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 5px;
+  /* нижние углы по радиусу .timeline (8px минус 1px рамки) */
+  border-radius: 0 0 7px 7px;
+  background: #58d6b2;
+  pointer-events: none;
 }
 
 .timeline-segments {
@@ -462,11 +493,7 @@ select {
 }
 
 .rhythm-dot {
-  fill: none;
-  stroke: #c9c9c9;
-  stroke-width: 4px;
-  stroke-linecap: round;
-  vector-effect: non-scaling-stroke;
+  fill: #c9c9c9;
 }
 
 .rhythm-tuplet-number {

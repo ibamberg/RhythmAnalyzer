@@ -44,20 +44,92 @@ export function hitMsFromPosition(position, passDurationMs, meter) {
   return (position / meter.unitsPerPass) * passDurationMs;
 }
 
-export function quantizePosition(position, meter) {
-  const candidates = buildQuantizationCandidates(meter);
-  let nearest = candidates[0];
-  let nearestDistance = Math.abs(position - nearest);
+const BINARY_STEPS = [0, 0.25, 0.5, 0.75, 1];
+const TERNARY_STEPS = [0, 1 / 6, 1 / 3, 1 / 2, 2 / 3, 5 / 6, 1];
+// Бинарная сетка — норма, триоль — помеченное исключение, поэтому триоль
+// выбираем только если она вписывается ЗАМЕТНО лучше (на ~25%), а не на
+// доли процента. Иначе плотный рандомный тап (~0.28 между ударами) случайно
+// перевешивал в пользу триолей и рисовал скобки «3» на ровном месте.
+const TERNARY_BIAS = 0.75;
 
-  for (const candidate of candidates) {
-    const distance = Math.abs(position - candidate);
-    if (distance < nearestDistance) {
-      nearest = candidate;
-      nearestDistance = distance;
-    }
+// Квантизация с одной сеткой на каждую долю: бинарной или триольной,
+// по меньшей суммарной ошибке (при равенстве — бинарная). Смешение сеток
+// внутри доли порождало невозможные комбинации длительностей
+// (например «три шестнадцатых + восьмая» в одной доле 4/4).
+export function quantizeHitPositions(positions, meter) {
+  if (meter.unitName !== "quarter") {
+    return positions.map((position) =>
+      clamp(Math.round(position * 2) / 2, 0, meter.unitsPerPass)
+    );
   }
 
-  return nearest;
+  const result = new Array(positions.length);
+  const beatBuckets = new Map();
+
+  positions.forEach((position, index) => {
+    const beat = clamp(Math.floor(position + EPSILON), 0, meter.unitsPerPass - 1);
+    if (!beatBuckets.has(beat)) {
+      beatBuckets.set(beat, []);
+    }
+    beatBuckets.get(beat).push(index);
+  });
+
+  for (const [beat, indexes] of beatBuckets) {
+    const binary = quantizeToSteps(positions, indexes, beat, BINARY_STEPS);
+    const ternary = quantizeToSteps(positions, indexes, beat, TERNARY_STEPS);
+    // Триоль — это деление доли на 3, поэтому триольную сетку выбираем,
+    // только когда в доле реально звучит триольная фигура: минимум 3 удара
+    // и якорь на основной триольной точке. Свинговую пару (2 удара) пишем
+    // бинарно — пунктиром, а не одинокой скобкой «3» над двумя нотами.
+    const isGenuineTriplet =
+      indexes.length >= 3 && hasPrimaryTripletHit(positions, indexes, beat);
+    const chosen =
+      ternary.error < binary.error * TERNARY_BIAS && isGenuineTriplet ? ternary : binary;
+
+    indexes.forEach((positionIndex, i) => {
+      result[positionIndex] = chosen.values[i];
+    });
+  }
+
+  return result;
+}
+
+const PRIMARY_TRIPLET_POINTS = [1 / 3, 2 / 3];
+const PRIMARY_TRIPLET_TOLERANCE = 0.09;
+
+// Триольная сетка содержит секстольные точки (1/6, 5/6), к которым легко
+// «прилипает» одиночный неточный удар: 0.82 доли — это поздняя «и» (0.75),
+// а не секстоль 5/6. Долю признаём триольной, только если хотя бы один удар
+// лежит рядом с основной триольной точкой.
+function hasPrimaryTripletHit(positions, indexes, beat) {
+  return indexes.some((index) => {
+    const local = positions[index] - beat;
+    return PRIMARY_TRIPLET_POINTS.some(
+      (point) => Math.abs(local - point) <= PRIMARY_TRIPLET_TOLERANCE
+    );
+  });
+}
+
+function quantizeToSteps(positions, indexes, beat, steps) {
+  let error = 0;
+  const values = indexes.map((index) => {
+    const local = positions[index] - beat;
+    let best = steps[0];
+    let bestDistance = Math.abs(local - best);
+
+    for (const step of steps) {
+      const distance = Math.abs(local - step);
+      if (distance < bestDistance) {
+        best = step;
+        bestDistance = distance;
+      }
+    }
+
+    error += bestDistance;
+    return round(beat + best, 6);
+  });
+
+  return { values, error };
 }
 
 export function getPositionTolerance(passDurationMs, unitsPerPass, config = APP_CONFIG.analysis) {
@@ -69,28 +141,4 @@ export function getPositionTolerance(passDurationMs, unitsPerPass, config = APP_
   );
 }
 
-function buildQuantizationCandidates(meter) {
-  const candidates = new Set([0, meter.unitsPerPass]);
-
-  if (meter.unitName === "quarter") {
-    for (let unit = 0; unit <= meter.unitsPerPass; unit += 1) {
-      candidates.add(round(unit, 6));
-      candidates.add(round(unit + 0.25, 6));
-      candidates.add(round(unit + 0.5, 6));
-      candidates.add(round(unit + 0.75, 6));
-      candidates.add(round(unit + 1 / 6, 6));
-      candidates.add(round(unit + 1 / 3, 6));
-      candidates.add(round(unit + 2 / 3, 6));
-      candidates.add(round(unit + 5 / 6, 6));
-    }
-  } else {
-    for (let unit = 0; unit <= meter.unitsPerPass; unit += 0.5) {
-      candidates.add(round(unit, 6));
-    }
-  }
-
-  return [...candidates]
-    .filter((candidate) => candidate >= 0 - EPSILON && candidate <= meter.unitsPerPass + EPSILON)
-    .sort((a, b) => a - b);
-}
 

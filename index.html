@@ -90,7 +90,7 @@
         </div>
       </section>
 
-      <section id="testPanel" class="test-panel panel" aria-label="Test hits">
+      <section id="testPanel" class="test-panel panel is-hidden" aria-label="Test hits">
         <label class="field test-mode-field">
           <span>Hits</span>
           <select id="testHitMode">
@@ -134,6 +134,7 @@
           <div id="timeline" class="timeline">
             <div id="beatMarkers" class="beat-markers"></div>
             <div id="timelineSegments" class="timeline-segments"></div>
+            <div id="hitHeat" class="hit-heat"></div>
             <div id="playhead" class="playhead"></div>
           </div>
         </section>
@@ -193,7 +194,7 @@
 
       <aside
         id="debugPanel"
-        class="debug-panel panel"
+        class="debug-panel panel is-hidden"
         aria-label="Debug panel"
       ></aside>
     </main>

@@ -1,21 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Rhythm Analyzer">
-  <rect width="64" height="64" rx="12" fill="#101315"/>
-  <g fill="none" stroke="#58d6b2" stroke-linecap="round" stroke-linejoin="round">
-    <rect x="10" y="13" width="44" height="38" rx="7" stroke-width="4"/>
-    <path stroke-width="3.5" d="M17 41h30"/>
-    <path stroke-width="2" d="M20 23v24"/>
-    <path stroke-width="2" d="M28 23v24"/>
-    <path stroke-width="2" d="M36 23v24"/>
-    <path stroke-width="2" d="M44 23v24"/>
-    <path stroke-width="3" d="M20 41v-8"/>
-    <path stroke-width="3" d="M28 41V28"/>
-    <path stroke-width="3" d="M36 41v-6"/>
-    <path stroke-width="3" d="M44 41V24"/>
+  <!-- Иконка повторяет пад приложения: внешнее бирюзовое кольцо,
+       среднее кольцо и янтарное ядро, плюс стрелка-метроном -->
+  <rect width="64" height="64" rx="14" fill="#101315"/>
+  <circle cx="32" cy="34" r="24" fill="none" stroke="#2c6373" stroke-width="3.5"/>
+  <circle cx="32" cy="34" r="16.5" fill="#12181a" stroke="#397d6b" stroke-width="2"/>
+  <circle cx="32" cy="34" r="9.5" fill="rgba(240, 184, 75, 0.18)" stroke="#f0b84b" stroke-width="2.5"/>
+  <g stroke="#58d6b2" stroke-linecap="round">
+    <line x1="32" y1="34" x2="45" y2="13" stroke-width="4"/>
   </g>
-  <g fill="#58d6b2">
-    <circle cx="20" cy="33" r="3"/>
-    <circle cx="28" cy="28" r="3"/>
-    <circle cx="36" cy="35" r="3"/>
-    <circle cx="44" cy="24" r="3"/>
-  </g>
+  <circle cx="32" cy="34" r="3" fill="#58d6b2"/>
 </svg>
